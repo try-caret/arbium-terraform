@@ -23,6 +23,7 @@ For the evolving infrastructure topology, see [`docs/topology.md`](docs/topology
 - Aurora PostgreSQL Serverless v2.
 - Secrets Manager secret containers only; secret values are populated out-of-band.
 - RDS-managed master user secret for Aurora credentials.
+- Optional ACM certificate request for the Arbium HTTPS ingress, with DNS validation records output for the customer's DNS provider.
 
 ## Usage
 
@@ -52,6 +53,8 @@ Default secret names:
 - `sentry`
 - `registry`
 - `gemini`
+- `enrollment`
+- `jwt`
 
 Aurora also creates an RDS-managed master user secret. Use that for migration/admin access until least-privilege DB roles are split out.
 
@@ -62,5 +65,6 @@ Operators must populate/rotate secret values outside Terraform so private values
 - Helm chart/workloads are owned outside Terraform.
 - Migration execution is still manual/temporary until the migration runner flow is finalized.
 - The current install path points app traffic at the Aurora writer endpoint.
-- AWS Load Balancer Controller, External Secrets Operator, and NVIDIA device plugin will be installed by Helm/operator flow in later slices unless customer standards require Terraform ownership.
+- AWS Load Balancer Controller, External Secrets Operator, and NVIDIA device plugin are installed by Terraform by default and can be disabled for customer-managed equivalents.
+- Optional ACM support only covers certificate request and validation DNS. Helm still creates the Ingress/ALB, and the final app DNS record is created after the ALB hostname exists.
 - Endpoint availability varies by region. If a selected endpoint service is unavailable in the target region, remove it from `interface_endpoint_services` in that environment's tfvars.

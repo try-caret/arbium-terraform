@@ -31,6 +31,11 @@ cluster_version                 = "1.31"
 cluster_endpoint_public_access  = true
 cluster_endpoint_private_access = true
 
+# Optional HTTPS ingress certificate. Terraform requests ACM and outputs the
+# DNS validation CNAMEs to create in the domain's DNS provider.
+# create_ingress_certificate = true
+# ingress_domain_name        = "chaindb.customer.example"
+
 general_node_instance_types = ["m6i.large"]
 general_node_min_size       = 1
 general_node_desired_size   = 1
@@ -48,7 +53,7 @@ gpu_node_max_size       = 1
 enable_nvidia_device_plugin = true
 
 # Secret containers only. Populate values out-of-band in AWS Secrets Manager.
-secret_names = ["db", "scheduler", "scim", "sentry", "registry", "gemini"]
+secret_names = ["db", "scheduler", "scim", "sentry", "registry", "gemini", "enrollment", "jwt"]
 
 # Aurora sizing. App traffic uses the Aurora writer endpoint.
 database_name                = "chaindb"

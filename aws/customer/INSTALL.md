@@ -161,36 +161,59 @@ kubectl get pods -n external-secrets
 
 ---
 
-## 4. Create the ACM cert + DNS validation
+## 4. Request the HTTPS certificate
 
-```bash
-AWS_PROFILE=<profile> aws acm request-certificate \
-  --domain-name chaindb.<customer>.com \
-  --validation-method DNS \
-  --region <aws_region>
+Terraform can request the ALB ACM certificate and output the DNS validation
+records to create in the customer's DNS provider.
+
+In `envs/<environment>.tfvars` set:
+
+```hcl
+create_ingress_certificate = true
+ingress_domain_name        = "chaindb.<customer>.com"
 ```
 
-Note the returned `CertificateArn`. Then fetch the DNS validation record:
+Apply the change:
 
 ```bash
-AWS_PROFILE=<profile> aws acm describe-certificate \
-  --certificate-arn <arn> \
-  --region <aws_region> \
-  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+AWS_PROFILE=<profile> terraform apply -var-file=envs/<environment>.tfvars
 ```
 
-Add the returned `{Name, Type, Value}` as a CNAME at your DNS provider.
-ACM validates within 5-30 min:
+Create the ACM validation CNAME at the domain's DNS provider from:
 
 ```bash
-AWS_PROFILE=<profile> aws acm describe-certificate \
-  --certificate-arn <arn> \
-  --region <aws_region> \
-  --query 'Certificate.Status'
-# wait for "ISSUED"
+terraform output ingress_certificate_validation_records
+terraform output -raw ingress_certificate_status_check_command
 ```
 
-Keep this ARN — you'll pass it into chart values in step 7.
+The validation output has this shape:
+
+```text
+<domain> = {
+  name  = "_<token>.<ingress-domain>"
+  type  = "CNAME"
+  value = "_<token>.acm-validations.aws."
+}
+```
+
+Create that DNS record exactly as shown by Terraform:
+
+| Field | Value |
+|---|---|
+| Type | `CNAME` |
+| Name/Host | `name` from Terraform output |
+| Target/Value | `value` from Terraform output |
+
+If the DNS provider offers proxying/CDN mode, keep this ACM validation record
+DNS-only. ACM must be able to resolve the AWS validation target directly.
+
+Run the status command until it returns `ISSUED`. Keep the ARN from:
+
+```bash
+terraform output -raw ingress_certificate_arn
+```
+
+You'll pass this ARN into chart values in step 7.
 
 ---
 
@@ -282,13 +305,13 @@ ingress:
   enabled: true
   className: alb
   host: chaindb.<customer>.com
+  scheme: internet-facing
+  certificateArn: "<terraform output -raw ingress_certificate_arn>"
+  # Optional: wafAclArn: <wafv2-arn>
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/certificate-arn: "<ACM_CERT_ARN>"
-    # Optional: alb.ingress.kubernetes.io/wafv2-acl-arn: <wafv2-arn>
 
 # Chart 0.1.4 bundles AWS RDS Global CA and auto-detects *.rds.amazonaws.com
 # hosts → strict TLS with the bundled bundle. Leave at "require" (default).
@@ -341,12 +364,17 @@ kubectl get ingress -n arbium arbium \
 # returns: <alb-name>.us-east-1.elb.amazonaws.com
 ```
 
-Add an A-record ALIAS (Route 53) or CNAME (other providers):
+Add the final app DNS record. This is separate from the ACM validation CNAME
+created in step 4.
 
-| Type | Name | Value |
-|---|---|---|
-| ALIAS (Route 53) | `chaindb.<customer>.com` | `<alb-hostname>.elb.amazonaws.com` |
-| CNAME (other) | `chaindb.<customer>.com` | `<alb-hostname>.elb.amazonaws.com` |
+| DNS provider | Type | Name | Value |
+|---|---|---|---|
+| Route 53 | `A`/`AAAA` ALIAS | `chaindb.<customer>.com` | `<alb-hostname>.elb.amazonaws.com` |
+| Other DNS providers | `CNAME` | `chaindb.<customer>.com` | `<alb-hostname>.elb.amazonaws.com` |
+
+If the DNS provider offers proxying/CDN mode, start with DNS-only for the final
+app record too. Enable proxying only after HTTPS and application behavior are
+verified.
 
 Confirm:
 

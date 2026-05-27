@@ -24,13 +24,15 @@ Terraform owns AWS primitives:
 - EKS OIDC provider for later IRSA roles.
 - Secrets Manager secret containers.
 - RDS-managed master user secret for Aurora.
+- Optional ACM certificate request and DNS validation record outputs for the customer's DNS provider.
 
 Terraform does **not** own:
 
 - Secret values. Operators populate those out-of-band.
 - Arbium/ChainDB Kubernetes workloads. Helm owns those.
 - Application migration execution. Driven by the Helm chart (Flyway-based `chaindb-migrate` runs as an initContainer on edge-fns pods and/or as an optional pre-install Helm hook).
-- Customer DNS/ACM/ALB behavior beyond future Terraform outputs and Helm values.
+- Arbium Ingress/ALB creation. Helm owns the Ingress resource and AWS Load Balancer Controller creates the ALB.
+- Final customer app DNS (`chaindb.customer.com -> ALB hostname`), because the ALB hostname exists only after Helm reconciliation.
 
 ## Network topology
 
@@ -142,6 +144,8 @@ Terraform creates empty Secrets Manager containers only:
 - `<name_prefix>/<environment>/sentry`
 - `<name_prefix>/<environment>/registry`
 - `<name_prefix>/<environment>/gemini`
+- `<name_prefix>/<environment>/enrollment`
+- `<name_prefix>/<environment>/jwt`
 
 Aurora also creates an RDS-managed master user secret. Use that secret for migration/admin access until least-privilege DB roles are split out.
 

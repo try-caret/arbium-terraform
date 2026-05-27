@@ -22,6 +22,27 @@ variable "tags" {
   default     = {}
 }
 
+variable "create_ingress_certificate" {
+  description = "Request an ACM certificate for the Arbium HTTPS ingress. Terraform outputs DNS validation records for the customer's DNS provider."
+  type        = bool
+  default     = false
+}
+
+variable "ingress_domain_name" {
+  description = "Full customer-owned DNS name for the Arbium HTTPS endpoint, e.g. chaindb.customer.example. Required when create_ingress_certificate is true."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = trimspace(var.ingress_domain_name) == "" || (
+      can(regex("^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$", trimspace(var.ingress_domain_name))) &&
+      !can(regex("\\.$", trimspace(var.ingress_domain_name)))
+    )
+    error_message = "ingress_domain_name must be a full DNS name such as chaindb.customer.example, without a trailing dot."
+  }
+}
+
+
 variable "vpc_cidr" {
   description = "CIDR block for the dedicated Arbium VPC."
   type        = string
@@ -177,7 +198,9 @@ variable "secret_names" {
     "scim",
     "sentry",
     "registry",
-    "gemini"
+    "gemini",
+    "enrollment",
+    "jwt"
   ]
 }
 
