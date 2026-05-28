@@ -157,8 +157,9 @@ printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add arbium-<env>
 printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add arbium-<env>-enrollment --data-file=- --project=<project_id>
 printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add arbium-<env>-jwt        --data-file=- --project=<project_id>
 
-# Provider keys
+# Provider keys and license
 printf '%s' "<gemini-api-key>" | gcloud secrets versions add arbium-<env>-gemini --data-file=- --project=<project_id>
+printf '%s' "<signed-arbium-license-key>" | gcloud secrets versions add arbium-<env>-license --data-file=- --project=<project_id>
 ```
 
 ### Why `sslmode=disable` on the DB URL is the secure default
@@ -279,16 +280,20 @@ externalSecrets:
     ROOTS_INTUNE_PILOT_ENROLLMENT_SECRET: arbium-<env>-enrollment
     GEMINI_API_KEY:                     arbium-<env>-gemini
     JWT_SECRET:                         arbium-<env>-jwt
+    ARBIUM_LICENSE_KEY:                 arbium-<env>-license
 
 secrets:
   create: false
+  existingSecret: chaindb-runtime
+
+license:
   existingSecret: arbium-runtime
 
 # Embedder: GPU recommended in production; chart can also do CPU.
 embedder:
   enabled: true
   gpu:
-    enabled: true   # uses arbium-embedder-gpu image on GPU node pool
+    enabled: true   # uses the embedder-gpu image on the GPU node pool
 
 # Ingress + Google-managed TLS at your real domain.
 ingress:
@@ -298,14 +303,14 @@ ingress:
   annotations:
     kubernetes.io/ingress.class: gce
     kubernetes.io/ingress.global-static-ip-name: <ingress_static_ip_name>
-    networking.gke.io/managed-certificates: arbium-tls
+    networking.gke.io/managed-certificates: chaindb-tls
     # Flip to "false" after ManagedCert flips to Active.
     kubernetes.io/ingress.allow-http: "true"
 
 tls:
   managedCertificate:
     enabled: true
-    name: arbium-tls
+    name: chaindb-tls
     domains:
       - chaindb.<customer>.com
 
@@ -321,11 +326,11 @@ EOF
 ## 8. Install the chart
 
 ```bash
-helm install arbium oci://ghcr.io/try-caret/charts/arbium \
-  --version 0.1.4 \
+helm install arbium oci://ghcr.io/try-caret/charts/chaindb \
+  --version <release-version> \
   --namespace arbium \
   --create-namespace \
-  --values charts/arbium/values-gcp.yaml \
+  --values charts/chaindb/values-gcp.yaml \
   --values <environment>.values.local.yaml \
   --timeout 15m \
   --wait
@@ -430,23 +435,23 @@ kubectl get pods,events -n arbium --sort-by='.lastTimestamp' | tail -30
 kubectl logs -n arbium -l app.kubernetes.io/component=edge-fns --tail=50
 ```
 
-Common causes (with chart 0.1.4 most are already fixed):
+Common causes:
 
 - Embedder OOM on small nodes → bump general pool to e2-standard-2+
 - Image pull 401 → forgot the GHCR pull secret in step 8
-- `arbium-runtime` Secret not synced yet → wait 30-60s for ESO to
+- `chaindb-runtime` Secret not synced yet → wait 30-60s for ESO to
   materialize from Secret Manager
 
 ### `relation "auth.users" does not exist`
 
-Pre-0.1.2 bug, fixed via initContainer. If you see this on 0.1.4+, the
-edge-fns image didn't get the new initContainer — check that
+Pre-0.1.2 bug, fixed via initContainer. If you see this on a current
+chart, the edge-fns image didn't get the new initContainer — check that
 `image.edgeFns.tag` resolves to a version ≥ 0.1.2.
 
 ### ManagedCertificate stuck at Provisioning
 
 ```bash
-kubectl describe managedcertificate -n arbium arbium-tls
+kubectl describe managedcertificate -n arbium chaindb-tls
 ```
 
 If `FailedNotVisible`: DNS hasn't propagated yet, or you set the wrong
@@ -464,16 +469,16 @@ too.
 ## Upgrading the chart
 
 ```bash
-helm upgrade arbium oci://ghcr.io/try-caret/charts/arbium \
-  --version 0.1.X \
+helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
+  --version <new-release-version> \
   --namespace arbium \
-  --values charts/arbium/values-gcp.yaml \
+  --values charts/chaindb/values-gcp.yaml \
   --values <environment>.values.local.yaml \
   --wait
 ```
 
 Migrations run automatically on the next edge-fns pod rollout (via
-initContainer). For chart-version changelog see `charts/arbium/Chart.yaml`
+initContainer). For chart-version changelog see `charts/chaindb/Chart.yaml`
 and `infra/gcp/customer/docs/test-run-*.md`.
 
 ---
@@ -508,7 +513,7 @@ operation in progress`. Two fixes:
 
 ```bash
 # Option A — drop --wait from the install command, then wait separately:
-helm install arbium oci://ghcr.io/try-caret/charts/arbium ...
+helm install arbium oci://ghcr.io/try-caret/charts/chaindb ...
 kubectl wait deployment -n arbium --for=condition=available --timeout=15m --all
 
 # Option B — patch the stuck release secret status to "failed":
@@ -546,7 +551,7 @@ Even with `pullPolicy: Always`, only NEW pods pull fresh. After re-pushing
 a same-tag image:
 
 ```bash
-kubectl rollout restart deployment/arbium-edge-fns -n arbium
+kubectl rollout restart deployment/chaindb-edge-fns -n arbium
 ```
 
 Better: bump the image tag (chart 0.1.4 → 0.1.5) so every restart guarantees

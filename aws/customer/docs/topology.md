@@ -160,13 +160,13 @@ Operators populate values outside Terraform. Do not put secret values in:
 
 ```text
 Arbium client / operator smoke test
-  -> arbium-edge-fns service on EKS
+  -> chaindb-edge-fns service on EKS
        -> Aurora PostgreSQL writer endpoint
-       -> arbium-embedder service on EKS GPU node
+       -> embedder service on EKS GPU node
        -> Gemini API for drain-batch
 
 Kubernetes CronJobs
-  -> arbium-edge-fns /functions/v1 scheduled endpoints
+  -> chaindb-edge-fns /functions/v1 scheduled endpoints
   -> Authorization: Bearer $CHAINDB_SCHEDULER_TOKEN
 ```
 

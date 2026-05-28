@@ -91,9 +91,9 @@ aurora_backup_retention_days = 7
 aurora_deletion_protection   = true
 aurora_skip_final_snapshot   = false
 
-# Cluster addons — chart 0.1.4 expects both to be installed.
+# Cluster addons — chart expects both to be installed.
 enable_lb_controller = true   # AWS Load Balancer Controller (ALB for chart Ingress)
-enable_eso           = true   # External Secrets Operator + IRSA for arbium-eso KSA
+enable_eso           = true   # External Secrets Operator + IRSA for the chart's `eso` KSA
 ```
 
 **Do not put secret values in tfvars** — Terraform creates empty
@@ -120,7 +120,7 @@ Creates:
 - Secrets Manager containers (empty)
 - AWS Load Balancer Controller (installed into kube-system via Helm)
 - External Secrets Operator (installed into external-secrets ns via Helm)
-- IRSA role for the arbium-eso KSA the chart will create
+- IRSA role for the `eso` KSA the chart will create
 
 Grab the outputs:
 
@@ -134,7 +134,7 @@ Key ones:
 - `aurora_cluster_endpoint` → DATABASE_URL host
 - `aurora_master_user_secret_arn` → RDS-managed `{username, password}` JSON
 - `secrets` → map of `{name → arn:aws:secretsmanager:.../arbium/<env>/<name>-XXXXX}`
-- `arbium_eso_role_arn` → IRSA role for the chart's `arbium-eso` KSA
+- `arbium_eso_role_arn` → IRSA role for the chart's `eso` KSA
 
 ---
 
@@ -243,6 +243,7 @@ push scheduler  "$(openssl rand -hex 32)"
 push enrollment "$(openssl rand -hex 32)"
 push jwt        "$(openssl rand -hex 32)"
 push gemini     "<gemini-api-key>"
+push license    "<signed-arbium-license-key>"
 ```
 
 > **Aurora username is `chaindb_admin`, not `postgres`.** The terraform
@@ -287,9 +288,13 @@ externalSecrets:
     ROOTS_INTUNE_PILOT_ENROLLMENT_SECRET: arbium/<env>/enrollment
     GEMINI_API_KEY:                     arbium/<env>/gemini
     JWT_SECRET:                         arbium/<env>/jwt
+    ARBIUM_LICENSE_KEY:                 arbium/<env>/license
 
 secrets:
   create: false
+  existingSecret: chaindb-runtime
+
+license:
   existingSecret: arbium-runtime
 
 # Aurora directly — no proxy needed.
@@ -299,7 +304,7 @@ cloudSqlProxy:
 embedder:
   enabled: true
   gpu:
-    enabled: true   # uses arbium-embedder-gpu image on GPU node pool
+    enabled: true   # uses the embedder-gpu image on the GPU node pool
 
 ingress:
   enabled: true
@@ -313,7 +318,7 @@ ingress:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
 
-# Chart 0.1.4 bundles AWS RDS Global CA and auto-detects *.rds.amazonaws.com
+# The chart's edge-fns image bundles the AWS RDS Global CA and auto-detects *.rds.amazonaws.com
 # hosts → strict TLS with the bundled bundle. Leave at "require" (default).
 config:
   databaseSsl: require
@@ -327,11 +332,11 @@ EOF
 ## 8. Install the chart
 
 ```bash
-helm install arbium oci://ghcr.io/try-caret/charts/arbium \
-  --version 0.1.4 \
+helm install arbium oci://ghcr.io/try-caret/charts/chaindb \
+  --version <release-version> \
   --namespace arbium \
   --create-namespace \
-  --values charts/arbium/values-aws.yaml \
+  --values charts/chaindb/values-aws.yaml \
   --values <environment>.values.local.yaml \
   --timeout 15m \
   --wait
@@ -468,16 +473,16 @@ both private + public subnets), or the ACM cert isn't `ISSUED` yet.
 ## Upgrading the chart
 
 ```bash
-helm upgrade arbium oci://ghcr.io/try-caret/charts/arbium \
-  --version 0.1.X \
+helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
+  --version <new-release-version> \
   --namespace arbium \
-  --values charts/arbium/values-aws.yaml \
+  --values charts/chaindb/values-aws.yaml \
   --values <environment>.values.local.yaml \
   --wait
 ```
 
 Migrations run automatically on the next edge-fns pod rollout (via
-initContainer). See `charts/arbium/Chart.yaml` and
+initContainer). See `charts/chaindb/Chart.yaml` and
 `infra/aws/customer/docs/test-run-*.md` for chart changelog.
 
 ---
@@ -522,7 +527,7 @@ recipe (kubectl patch on the helm release secret).
 ### Re-pushing the same image tag doesn't restart existing pods
 
 ```bash
-kubectl rollout restart deployment/arbium-edge-fns -n arbium
+kubectl rollout restart deployment/chaindb-edge-fns -n arbium
 ```
 
 Better: bump the chart's `image.edgeFns.tag` to a new immutable tag.

@@ -2,7 +2,7 @@
 
 Terraform root for the customer GCP deployment plan: dedicated VPC, GKE Standard cluster, managed node pools, Cloud NAT egress, Cloud SQL PostgreSQL with Private Service Access, and Secret Manager secret containers.
 
-This root intentionally creates GCP primitives only. Helm owns Arbium/ChainDB Kubernetes workloads — see `charts/arbium/`.
+This root intentionally creates GCP primitives only. Helm owns the ChainDB Kubernetes workloads — see `charts/chaindb/`.
 
 For the architecture rationale and module layout, see [`PLAN.md`](PLAN.md).
 For the evolving topology, see [`docs/topology.md`](docs/topology.md).
@@ -53,7 +53,7 @@ Operators populate/rotate app secret values outside Terraform.
 
 ## Notes / current slice boundaries
 
-- Helm chart/workloads are owned outside Terraform (`charts/arbium/`).
+- Helm chart/workloads are owned outside Terraform (`charts/chaindb/`).
 - Migration execution is still manual/temporary until the migration runner flow is finalized.
 - App traffic points at the Cloud SQL private IP. The Cloud SQL admin user is intended for migrations/admin only; least-privilege app roles are a later slice.
 - AlloyDB is a one-knob swap if a customer's load requires it; Cloud SQL Postgres is the default for cost.

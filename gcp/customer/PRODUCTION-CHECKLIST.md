@@ -78,10 +78,10 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
       Identity. Validated on arbium-tftest: ESO syncs the K8s Secret
       and edge-fns env shows DATABASE_URL/JWT/etc. resolved from Secret
       Manager. Customer flips `secrets.create=false` +
-      `secrets.existingSecret=<release>-runtime`.
+      `secrets.existingSecret=chaindb-runtime`.
 - [x] Terraform creates a dedicated GSA (arbium-<env>-eso) with
       `roles/secretmanager.secretAccessor` + workloadIdentityUser binding
-      for the chart's `arbium-eso` KSA.
+      for the chart's `eso` KSA.
 - [x] Default `secret_names` now includes `enrollment` + `jwt` so all
       keys the chart needs come from Terraform-managed containers.
 - [ ] Install External Secrets Operator helm chart in the cluster as
@@ -173,8 +173,7 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
 
 ## Tier 3 — nice-to-have
 
-- [ ] Switch chart distribution from local-path to OCI registry
-      (`ghcr.io/try-caret/charts/arbium` per the conversation earlier).
+- [x] Chart distribution is OCI registry: `oci://ghcr.io/try-caret/charts/chaindb`.
 - [ ] Bump `Chart.yaml:version` to `1.0.0`, add CHANGELOG, set up CI
       publish on chart change.
 - [ ] Migrate Terraform state from local to GCS backend

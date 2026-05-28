@@ -4,7 +4,7 @@ Sibling of `infra/aws/customer/`. This is the GCP port of the AWS customer found
 
 ## Goal
 
-Stand up a clean, repeatable GCP foundation that the same `charts/arbium` Helm chart can install onto, with the same ownership boundaries as the AWS path: Terraform owns cloud primitives, Helm owns Kubernetes workloads, secret values are populated out-of-band.
+Stand up a clean, repeatable GCP foundation that the same `charts/chaindb` Helm chart can install onto, with the same ownership boundaries as the AWS path: Terraform owns cloud primitives, Helm owns Kubernetes workloads, secret values are populated out-of-band.
 
 ## Architecture decisions (defaults — overridable per environment)
 
