@@ -109,11 +109,11 @@ resource "helm_release" "lb_controller" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# External Secrets Operator (controller) + IRSA role for the arbium-eso KSA
+# External Secrets Operator (controller) + IRSA role for the `eso` KSA
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # The operator itself runs without AWS perms; the IRSA role is on the SA the
-# Arbium chart creates (arbium-eso in the arbium namespace), which ESO
+# ChainDB chart creates (`eso` in the `arbium` namespace), which ESO
 # impersonates when calling Secrets Manager via the chart's ClusterSecretStore.
 
 resource "helm_release" "eso" {
@@ -150,9 +150,9 @@ data "aws_iam_policy_document" "arbium_eso_assume" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_issuer_host}:sub"
-      # KSA: arbium-eso in the namespace where the chart is installed
+      # KSA: `eso` in the namespace where the chart is installed
       # (defaults to "arbium"; override via var.arbium_namespace).
-      values = ["system:serviceaccount:${var.arbium_namespace}:arbium-eso"]
+      values = ["system:serviceaccount:${var.arbium_namespace}:eso"]
     }
 
     condition {

@@ -281,19 +281,19 @@ variable "lb_controller_chart_version" {
 }
 
 variable "enable_eso" {
-  description = "Install External Secrets Operator + IRSA role for the arbium-eso KSA. Required if the Arbium chart's externalSecrets.enabled=true."
+  description = "Install External Secrets Operator + IRSA role for the chart's `eso` KSA. Required if externalSecrets.enabled=true in the ChainDB chart values."
   type        = bool
   default     = true
 }
 
 variable "eso_chart_version" {
-  description = "Helm chart version for external-secrets. 2.0+ serves the v1 API the Arbium chart uses; older ESO only serves v1beta1."
+  description = "Helm chart version for external-secrets. 2.0+ serves the v1 API the ChainDB chart uses; older ESO only serves v1beta1."
   type        = string
   default     = "2.5.0"
 }
 
 variable "arbium_namespace" {
-  description = "Kubernetes namespace the Arbium chart installs into. Determines IRSA subject for the arbium-eso SA."
+  description = "Kubernetes namespace the ChainDB chart installs into. Determines IRSA subject for the `eso` SA."
   type        = string
   default     = "arbium"
 }

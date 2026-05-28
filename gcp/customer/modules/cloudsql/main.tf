@@ -126,7 +126,7 @@ resource "google_project_iam_member" "cloudsql_proxy_client" {
   member  = "serviceAccount:${google_service_account.cloudsql_proxy[0].email}"
 }
 
-# Bind the Helm chart's KSA (arbium/arbium-cloud-sql-proxy by default) to
+# Bind the Helm chart's KSA (arbium/cloud-sql-proxy by default) to
 # impersonate the proxy GSA via Workload Identity.
 resource "google_service_account_iam_member" "cloudsql_proxy_wi" {
   count = var.create_proxy_sa ? 1 : 0

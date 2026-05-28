@@ -64,7 +64,7 @@ output "lb_controller_role_arn" {
 }
 
 output "arbium_eso_role_arn" {
-  description = "IRSA role ARN for the arbium-eso KSA. Pass to externalSecrets.serviceAccount.annotations[eks.amazonaws.com/role-arn] in chart values."
+  description = "IRSA role ARN for the chart's `eso` KSA. Pass to externalSecrets.serviceAccount.annotations[eks.amazonaws.com/role-arn] in chart values."
   value       = var.enable_eso ? aws_iam_role.arbium_eso[0].arn : ""
 }
 

@@ -81,5 +81,5 @@ variable "proxy_workload_identity_namespace" {
 variable "proxy_workload_identity_ksa_name" {
   description = "Kubernetes service account name used by the Cloud SQL Auth Proxy pod. Must match the chart's serviceAccount.cloudSqlProxy.name."
   type        = string
-  default     = "arbium-cloud-sql-proxy"
+  default     = "cloud-sql-proxy"
 }

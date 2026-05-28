@@ -34,5 +34,5 @@ variable "eso_workload_identity_namespace" {
 variable "eso_workload_identity_ksa_name" {
   description = "KSA used by the ESO ClusterSecretStore. Must match externalSecrets.serviceAccount.name in the chart."
   type        = string
-  default     = "arbium-eso"
+  default     = "eso"
 }

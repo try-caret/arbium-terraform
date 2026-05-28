@@ -103,7 +103,7 @@ resource "google_compute_global_address" "ingress" {
 #
 #   apiVersion: cloud.google.com/v1
 #   kind: BackendConfig
-#   metadata: { name: arbium-edge-fns, namespace: arbium }
+#   metadata: { name: chaindb-edge-fns, namespace: arbium }
 #   spec:
 #     securityPolicy:
 #       name: arbium-<env>-armor
