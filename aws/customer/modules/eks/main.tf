@@ -153,6 +153,19 @@ resource "aws_eks_addon" "this" {
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 
+  # IP-efficient warm pool so the stack fits a /24 VPC. By default the CNI keeps
+  # a whole spare ENI warm (~10-15 IPs held per node even near-idle), which
+  # exhausts a /26 per-AZ subnet fast. WARM_IP_TARGET holds only (running pods
+  # + 2) IPs; MINIMUM_IP_TARGET keeps a small floor so fresh nodes schedule
+  # their first pods without an extra EC2 AllocateIPs round-trip. Trade-off:
+  # slightly more EC2 API calls under burst scheduling — negligible here.
+  configuration_values = each.value == "vpc-cni" ? jsonencode({
+    env = {
+      WARM_IP_TARGET    = "2"
+      MINIMUM_IP_TARGET = "8"
+    }
+  }) : null
+
   tags = var.tags
 
   depends_on = [

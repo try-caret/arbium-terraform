@@ -44,9 +44,9 @@ variable "ingress_domain_name" {
 
 
 variable "vpc_cidr" {
-  description = "CIDR block for the dedicated Arbium VPC."
+  description = "CIDR block for the dedicated Arbium VPC. Default is a /24 — a single ChainDB customer cluster fits comfortably in 256 IPs given the WARM_IP_TARGET CNI tuning (see modules/eks). Widen to /22+ only for heavy autoscale or multi-cluster."
   type        = string
-  default     = "10.80.0.0/16"
+  default     = "10.80.0.0/24"
 }
 
 variable "availability_zones" {
@@ -56,15 +56,15 @@ variable "availability_zones" {
 }
 
 variable "private_subnet_cidrs" {
-  description = "Private subnet CIDRs, one per selected AZ."
+  description = "Private subnet CIDRs, one per selected AZ. Default carves three /26s (59 usable each) out of the /24 vpc_cidr — holds nodes, pods (warm-pool-tuned CNI), VPC endpoints, and Aurora."
   type        = list(string)
-  default     = ["10.80.0.0/20", "10.80.16.0/20", "10.80.32.0/20"]
+  default     = ["10.80.0.0/26", "10.80.0.64/26", "10.80.0.128/26"]
 }
 
 variable "public_subnet_cidrs" {
-  description = "Public subnet CIDRs, one per selected AZ. Required when create_public_subnets is true."
+  description = "Public subnet CIDRs, one per selected AZ. Required when create_public_subnets is true. Default carves three /28s (11 usable each) for the ALB + NAT — meets the ALB 8-free-IP minimum. Drop to 2 AZs (bigger subnets) if the internet-facing ALB needs more headroom."
   type        = list(string)
-  default     = ["10.80.240.0/24", "10.80.241.0/24", "10.80.242.0/24"]
+  default     = ["10.80.0.192/28", "10.80.0.208/28", "10.80.0.224/28"]
 }
 
 variable "create_public_subnets" {

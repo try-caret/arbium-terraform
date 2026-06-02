@@ -177,6 +177,23 @@ data "aws_iam_policy_document" "arbium_eso_secrets" {
       "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.name_prefix}/${var.environment}/*",
     ]
   }
+
+  # Read the Aurora RDS-managed master-user secret so ESO can build
+  # DATABASE_URL from the rotating credential (externalSecrets.db.fromManagedSecret
+  # in the chart). This secret lives outside the arbium/<env>/* prefix — AWS
+  # names it `rds!cluster-…` — so it needs its own statement. Scoped to this
+  # cluster's master secret ARN only.
+  statement {
+    sid    = "ReadAuroraManagedSecret"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
+    resources = [
+      module.aurora.master_user_secret_arn,
+    ]
+  }
 }
 
 data "aws_caller_identity" "current" {}
