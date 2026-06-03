@@ -4,7 +4,7 @@ Terraform root for the customer AWS deployment plan: dedicated VPC, EKS cluster,
 
 This root intentionally creates AWS primitives only. Helm owns Arbium/ChainDB Kubernetes workloads in later slices.
 
-For the evolving infrastructure topology, see [`docs/topology.md`](docs/topology.md).
+See [`INSTALL.md`](INSTALL.md) for the end-to-end install runbook.
 
 ## What this creates
 

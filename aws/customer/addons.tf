@@ -75,32 +75,44 @@ resource "helm_release" "lb_controller" {
   namespace        = "kube-system"
   create_namespace = false
 
-  set = [
-    {
-      name  = "clusterName"
-      value = module.eks.cluster_name
-    },
-    {
-      name  = "region"
-      value = var.aws_region
-    },
-    {
-      name  = "vpcId"
-      value = module.network.vpc_id
-    },
-    {
-      name  = "serviceAccount.create"
-      value = "true"
-    },
-    {
-      name  = "serviceAccount.name"
-      value = "aws-load-balancer-controller"
-    },
-    {
-      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = aws_iam_role.lbc[0].arn
-    },
-  ]
+  # defaultTags applies these to every ALB/NLB the controller creates at
+  # runtime. Terraform's provider default_tags can't reach controller-created
+  # load balancers, so under a tag-enforcement SCP an untagged ELB create is
+  # denied. Driven from local.tags so each env tags its own LBs correctly.
+  set = concat(
+    [
+      {
+        name  = "clusterName"
+        value = module.eks.cluster_name
+      },
+      {
+        name  = "region"
+        value = var.aws_region
+      },
+      {
+        name  = "vpcId"
+        value = module.network.vpc_id
+      },
+      {
+        name  = "serviceAccount.create"
+        value = "true"
+      },
+      {
+        name  = "serviceAccount.name"
+        value = "aws-load-balancer-controller"
+      },
+      {
+        name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+        value = aws_iam_role.lbc[0].arn
+      },
+    ],
+    [
+      for k, v in local.tags : {
+        name  = "defaultTags.${k}"
+        value = tostring(v)
+      }
+    ],
+  )
 
   depends_on = [
     aws_iam_role_policy_attachment.lbc,

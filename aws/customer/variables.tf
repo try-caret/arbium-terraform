@@ -123,6 +123,12 @@ variable "cluster_endpoint_private_access" {
   default     = true
 }
 
+variable "enable_node_launch_template" {
+  description = "Attach a launch template to the managed node groups so the required tags propagate to EC2 instances, EBS volumes, and primary ENIs. Off by default; enabling replaces existing node groups. Set true for tag-enforced customer accounts."
+  type        = bool
+  default     = false
+}
+
 variable "general_node_instance_types" {
   description = "Instance types for the general managed node group."
   type        = list(string)

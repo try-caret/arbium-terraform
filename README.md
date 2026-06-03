@@ -12,7 +12,7 @@ mirrored here with matching release tags.
 
 ```hcl
 module "arbium_aws" {
-  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.2.13"
+  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.2.15"
 
   # Set required variables here.
 }
@@ -24,7 +24,7 @@ See [aws/customer/README.md](aws/customer/README.md).
 
 ```hcl
 module "arbium_gcp" {
-  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.2.13"
+  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.2.15"
 
   # Set required variables here.
 }
@@ -35,7 +35,7 @@ See [gcp/customer/README.md](gcp/customer/README.md).
 ## Versioning
 
 Release tags in this repository match Arbium release tags in the private source
-repository. Customers should pin `?ref=chaindb-v0.2.13` or another explicit
+repository. Customers should pin `?ref=chaindb-v0.2.15` or another explicit
 release tag, not `main`.
 
 ## What is included
@@ -43,7 +43,11 @@ release tag, not `main`.
 - `aws/customer`: AWS customer foundation root and local modules.
 - `gcp/customer`: GCP customer foundation root and local modules.
 
-Secret-bearing files, local `.tfvars` other than checked-in
-`envs/example.tfvars` examples, Terraform state, generated local Terraform
-directories, internal test-run notes, and helper scripts are excluded from this
-public mirror.
+The public mirror is intentionally minimal: the Terraform modules
+(`*.tf`, `modules/`, `policies/`), `README.md`, `INSTALL.md`, `PLAN.md`,
+`envs/example.tfvars`, and `gcp/customer/docs/` customer docs. Excluded:
+all of `aws/customer/docs/` (internal — accounts/buckets/operator notes),
+internal test-run notes and dashboards, local `.tfvars` other than
+`envs/example.tfvars`, Helm `*.values*.yaml`, the operator backend wiring
+(`backend.tf`, `backends/`), Terraform state, generated local Terraform
+directories, and helper scripts.

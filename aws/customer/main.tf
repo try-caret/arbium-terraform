@@ -5,12 +5,18 @@ data "aws_availability_zones" "available" {
 locals {
   azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, 3)
 
+  # The module deliberately does NOT emit an `environment` tag. It emits
+  # `deployment` (the cluster name) as its per-stack identifier instead, so the
+  # module's keys never overlap with caller-supplied keys like `environment`,
+  # `team`, or `application`. This avoids IAM's case-insensitive duplicate-key
+  # rejection (e.g. `Environment`+`environment`) entirely: every key below is
+  # distinct from var.tags, so merge() only ever adds — it never overwrites.
   tags = merge(
     {
-      Project     = "Arbium"
-      Component   = "ChainDB"
-      Environment = var.environment
-      ManagedBy   = "Terraform"
+      Project    = "Arbium"
+      Component  = "ChainDB"
+      deployment = "${var.name_prefix}-${var.environment}"
+      ManagedBy  = "Terraform"
     },
     var.tags,
   )
@@ -52,6 +58,7 @@ module "eks" {
   gpu_node_min_size               = var.gpu_node_min_size
   gpu_node_desired_size           = var.gpu_node_desired_size
   gpu_node_max_size               = var.gpu_node_max_size
+  enable_node_launch_template     = var.enable_node_launch_template
   tags                            = local.tags
 }
 

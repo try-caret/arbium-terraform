@@ -3,8 +3,7 @@
 End-to-end install of Arbium/ChainDB on a fresh AWS account. Targets
 chart **0.1.4+**.
 
-Tested 2026-05-23 — see `docs/test-run-2026-05-23.md` for the transcript
-and the 10 issues that informed this rewrite.
+Tested 2026-05-23.
 
 ```
 terraform → kubectl creds → ACM cert + DNS validation → Secret Manager population → helm install → smoke
@@ -482,8 +481,7 @@ helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
 ```
 
 Migrations run automatically on the next edge-fns pod rollout (via
-initContainer). See `charts/chaindb/Chart.yaml` and
-`infra/aws/customer/docs/test-run-*.md` for chart changelog.
+initContainer). See `charts/chaindb/Chart.yaml` for the chart changelog.
 
 ---
 

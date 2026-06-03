@@ -18,3 +18,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "enable_node_launch_template" {
+  description = "Attach a launch template to the managed node groups so tags propagate to the EC2 instances, EBS volumes, and primary ENIs (which EKS does NOT tag from node-group tags). Off by default; enabling it replaces existing node groups, so opt in per environment."
+  type        = bool
+  default     = false
+}

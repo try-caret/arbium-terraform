@@ -91,7 +91,7 @@ Estimated test burn: ~**$0.20/hr**. I'll destroy at the end.
 
 ## Test run outcome (2026-05-22)
 
-Full apply + verification + destroy executed against `chaindb-494009`. See [`docs/test-run-2026-05-22.md`](docs/test-run-2026-05-22.md) for the play-by-play, including four real bugs caught and fixed in-tree.
+Full apply + verification + destroy executed against `chaindb-494009` — including four real bugs caught and fixed in-tree.
 
 Headline:
 - **28 resources** deployed cleanly after fixes.

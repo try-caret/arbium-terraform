@@ -4,8 +4,7 @@ End-to-end install of Arbium/ChainDB on a fresh GCP project. Targets
 chart **0.1.4+** (cloud-agnostic, GHCR-published, schema migrations as
 edge-fns initContainer).
 
-Tested 2026-05-23 — see `docs/test-run-2026-05-23.md` for the transcript
-and the 14 issues that informed this rewrite.
+Tested 2026-05-23.
 
 ```
 terraform → kubectl creds → Secret Manager population → helm install → DNS → wait for cert → smoke
@@ -478,8 +477,7 @@ helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
 ```
 
 Migrations run automatically on the next edge-fns pod rollout (via
-initContainer). For chart-version changelog see `charts/chaindb/Chart.yaml`
-and `infra/gcp/customer/docs/test-run-*.md`.
+initContainer). For chart-version changelog see `charts/chaindb/Chart.yaml`.
 
 ---
 

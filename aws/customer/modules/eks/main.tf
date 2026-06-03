@@ -75,6 +75,31 @@ resource "aws_iam_role_policy_attachment" "nodes" {
   policy_arn = each.value
 }
 
+# Managed node groups do NOT propagate node-group tags to the launched EC2
+# instances, their EBS volumes, or their primary ENIs. A launch template with
+# tag_specifications is the only way to tag those at launch. No image_id/
+# instance_type here, so EKS still selects the AMI from ami_type and uses the
+# node group's instance_types. Gated because attaching it replaces node groups.
+resource "aws_launch_template" "node" {
+  count       = var.enable_node_launch_template ? 1 : 0
+  name_prefix = "${local.cluster_name}-node-"
+
+  tag_specifications {
+    resource_type = "instance"
+    tags          = var.tags
+  }
+  tag_specifications {
+    resource_type = "volume"
+    tags          = var.tags
+  }
+  tag_specifications {
+    resource_type = "network-interface"
+    tags          = var.tags
+  }
+
+  tags = var.tags
+}
+
 resource "aws_eks_node_group" "general" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "general"
@@ -82,6 +107,14 @@ resource "aws_eks_node_group" "general" {
   subnet_ids      = var.subnet_ids
   instance_types  = var.general_node_instance_types
   capacity_type   = "ON_DEMAND"
+
+  dynamic "launch_template" {
+    for_each = var.enable_node_launch_template ? [1] : []
+    content {
+      id      = aws_launch_template.node[0].id
+      version = aws_launch_template.node[0].latest_version
+    }
+  }
 
   scaling_config {
     min_size     = var.general_node_min_size
@@ -112,6 +145,14 @@ resource "aws_eks_node_group" "gpu" {
   instance_types  = var.gpu_node_instance_types
   ami_type        = var.gpu_node_ami_type
   capacity_type   = "ON_DEMAND"
+
+  dynamic "launch_template" {
+    for_each = var.enable_node_launch_template ? [1] : []
+    content {
+      id      = aws_launch_template.node[0].id
+      version = aws_launch_template.node[0].latest_version
+    }
+  }
 
   scaling_config {
     min_size     = var.gpu_node_min_size
@@ -159,10 +200,16 @@ resource "aws_eks_addon" "this" {
   # + 2) IPs; MINIMUM_IP_TARGET keeps a small floor so fresh nodes schedule
   # their first pods without an extra EC2 AllocateIPs round-trip. Trade-off:
   # slightly more EC2 API calls under burst scheduling — negligible here.
+  #
+  # ADDITIONAL_ENI_TAGS propagates the env tags onto the secondary ENIs the CNI
+  # creates for pods at runtime via the node role (Terraform's default_tags
+  # can't reach them), satisfying tag-enforcement SCPs that gate
+  # ec2:CreateNetworkInterface.
   configuration_values = each.value == "vpc-cni" ? jsonencode({
     env = {
-      WARM_IP_TARGET    = "2"
-      MINIMUM_IP_TARGET = "8"
+      WARM_IP_TARGET      = "2"
+      MINIMUM_IP_TARGET   = "8"
+      ADDITIONAL_ENI_TAGS = jsonencode(var.tags)
     }
   }) : null
 
