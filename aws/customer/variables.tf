@@ -303,3 +303,15 @@ variable "arbium_namespace" {
   type        = string
   default     = "arbium"
 }
+
+variable "enable_reloader" {
+  description = "Install Stakater Reloader (cluster-wide controller that rolls Deployments the ChainDB chart annotates when chaindb-runtime rotates). Required for secret-rotation self-heal; harmless no-op if no workload is annotated."
+  type        = bool
+  default     = true
+}
+
+variable "reloader_chart_version" {
+  description = "Helm chart version for stakater/reloader. Verify against https://github.com/stakater/Reloader/releases (helm search repo stakater/reloader --versions) before bumping."
+  type        = string
+  default     = "1.4.10"
+}

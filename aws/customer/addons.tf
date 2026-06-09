@@ -261,3 +261,36 @@ resource "helm_release" "nvidia_device_plugin" {
 
   depends_on = [module.eks]
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stakater Reloader (controller)
+# Watches Secrets/ConfigMaps cluster-wide and rolls any Deployment carrying the
+# `secret.reloader.stakater.com/reload` annotation that the ChainDB chart emits
+# (on admin-ui / chaindb-edge-fns / scim when reloader.enabled=true). This is
+# what makes a rotated chaindb-runtime (the AWS-weekly Aurora master password
+# plus every other ESO-synced key) auto-restart its consumers instead of
+# silently breaking until a manual `kubectl rollout restart`. RBAC-only — no
+# IRSA / AWS perms, so no role/policy plumbing like ESO/LBC.
+# ─────────────────────────────────────────────────────────────────────────────
+resource "helm_release" "reloader" {
+  count            = var.enable_reloader ? 1 : 0
+  name             = "reloader"
+  repository       = "https://stakater.github.io/stakater-charts"
+  chart            = "reloader"
+  version          = var.reloader_chart_version
+  namespace        = "reloader"
+  create_namespace = true
+
+  set = [
+    {
+      name  = "reloader.watchGlobally"
+      value = "true"
+    },
+    {
+      name  = "reloader.reloadOnCreate"
+      value = "true"
+    },
+  ]
+
+  depends_on = [module.eks]
+}
