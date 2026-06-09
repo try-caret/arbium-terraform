@@ -77,21 +77,28 @@ resource "google_sql_database" "chaindb" {
 }
 
 resource "random_password" "admin" {
+  count = var.create_admin_user ? 1 : 0
+
   length           = 32
   special          = true
   override_special = "!@#%^&*()-_=+[]{}<>?"
 }
 
 resource "google_sql_user" "admin" {
+  count = var.create_admin_user ? 1 : 0
+
   project  = var.project_id
   name     = "chaindb_admin"
   instance = google_sql_database_instance.this.name
-  password = random_password.admin.result
+  password = random_password.admin[0].result
 }
 
 # Mirror RDS's master-user-secret pattern by storing the generated admin password in
-# Secret Manager. Operators rotate by overwriting this secret.
+# Secret Manager. Operators rotate by overwriting this secret. Hosted cloud disables
+# this path so Terraform never stores DB credentials in state.
 resource "google_secret_manager_secret" "admin_password" {
+  count = var.create_admin_user ? 1 : 0
+
   project   = var.project_id
   secret_id = "${local.name}-cloudsql-admin"
 
@@ -103,8 +110,10 @@ resource "google_secret_manager_secret" "admin_password" {
 }
 
 resource "google_secret_manager_secret_version" "admin_password" {
-  secret      = google_secret_manager_secret.admin_password.id
-  secret_data = random_password.admin.result
+  count = var.create_admin_user ? 1 : 0
+
+  secret      = google_secret_manager_secret.admin_password[0].id
+  secret_data = random_password.admin[0].result
 }
 
 # Dedicated GSA for the Cloud SQL Auth Proxy running in-cluster. The proxy

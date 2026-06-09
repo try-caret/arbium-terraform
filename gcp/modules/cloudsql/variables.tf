@@ -61,6 +61,12 @@ variable "deletion_protection" {
   default = true
 }
 
+variable "create_admin_user" {
+  description = "Create a Terraform-managed admin SQL user and generated password secret version. Disable for hosted environments where operators manage DB credentials outside Terraform state."
+  type        = bool
+  default     = true
+}
+
 variable "labels" {
   type    = map(string)
   default = {}

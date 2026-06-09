@@ -11,7 +11,7 @@ locals {
 }
 
 module "network" {
-  source = "./modules/network"
+  source = "../modules/network"
 
   project_id       = var.project_id
   region           = var.region
@@ -26,7 +26,7 @@ module "network" {
 }
 
 module "gke" {
-  source = "./modules/gke"
+  source = "../modules/gke"
 
   project_id                      = var.project_id
   region                          = var.region
@@ -55,7 +55,7 @@ module "gke" {
 }
 
 module "cloudsql" {
-  source = "./modules/cloudsql"
+  source = "../modules/cloudsql"
 
   project_id               = var.project_id
   region                   = var.region
@@ -71,13 +71,14 @@ module "cloudsql" {
   availability_type        = var.cloudsql_availability_type
   backup_retention_days    = var.cloudsql_backup_retention_days
   deletion_protection      = var.cloudsql_deletion_protection
+  create_admin_user        = var.cloudsql_create_admin_user
   labels                   = local.labels
 
   depends_on = [module.network]
 }
 
 module "secrets" {
-  source = "./modules/secrets"
+  source = "../modules/secrets"
 
   project_id   = var.project_id
   name_prefix  = var.name_prefix

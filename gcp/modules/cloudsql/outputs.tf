@@ -15,11 +15,11 @@ output "database_name" {
 }
 
 output "admin_user" {
-  value = google_sql_user.admin.name
+  value = var.create_admin_user ? google_sql_user.admin[0].name : ""
 }
 
 output "admin_password_secret_id" {
-  value = google_secret_manager_secret.admin_password.secret_id
+  value = var.create_admin_user ? google_secret_manager_secret.admin_password[0].secret_id : ""
 }
 
 output "proxy_service_account_email" {

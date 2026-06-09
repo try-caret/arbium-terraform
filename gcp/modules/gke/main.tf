@@ -165,8 +165,12 @@ resource "google_container_node_pool" "embedder_gpu" {
   location = var.region
 
   autoscaling {
-    min_node_count = var.gpu_node_min_size
-    max_node_count = var.gpu_node_max_size
+    # GPU pools are expensive and usually run one replica across the regional
+    # cluster, not one per zone. Use total_* so hosted staging can keep exactly
+    # one warm L4 node while still letting GKE choose the zone.
+    total_min_node_count = var.gpu_node_min_size
+    total_max_node_count = var.gpu_node_max_size
+    location_policy      = "BALANCED"
   }
 
   initial_node_count = var.gpu_node_min_size

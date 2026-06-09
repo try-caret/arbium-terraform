@@ -51,6 +51,7 @@ cloudsql_disk_autoresize_limit_gb = 200
 cloudsql_availability_type        = "ZONAL"
 cloudsql_backup_retention_days    = 7
 cloudsql_deletion_protection      = true
+cloudsql_create_admin_user        = true
 
 # Secret containers only. Populate values out-of-band in Secret Manager.
 secret_names = ["db", "scheduler", "scim", "sentry", "registry", "gemini", "enrollment", "jwt"]

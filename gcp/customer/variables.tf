@@ -219,6 +219,12 @@ variable "cloudsql_deletion_protection" {
   default     = true
 }
 
+variable "cloudsql_create_admin_user" {
+  description = "Create a Terraform-managed chaindb_admin SQL user and generated password secret version. Customer roots default to true for installer convenience."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # Secret Manager
 # -----------------------------------------------------------------------------
