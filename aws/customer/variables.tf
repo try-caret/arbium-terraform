@@ -311,7 +311,7 @@ variable "enable_reloader" {
 }
 
 variable "reloader_chart_version" {
-  description = "Helm chart version for stakater/reloader. Verify against https://github.com/stakater/Reloader/releases (helm search repo stakater/reloader --versions) before bumping."
+  description = "Helm CHART version for stakater/reloader (note: chart 2.2.x packages app v1.4.x — do not confuse the two). Verify with `helm search repo stakater/reloader --versions` before bumping."
   type        = string
-  default     = "1.4.10"
+  default     = "2.2.12"
 }
