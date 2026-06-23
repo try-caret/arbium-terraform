@@ -80,6 +80,18 @@ resource "google_container_cluster" "this" {
     }
   }
 
+  # DNS-based control-plane endpoint: IAM-authorized, IP-agnostic access. With
+  # this on, anyone holding valid gcloud creds + container IAM (e.g.
+  # roles/container.developer) can connect from ANY network via
+  # `gcloud container clusters get-credentials --dns-endpoint` — control-plane
+  # access stops depending on master_authorized_networks IP allow-listing (the
+  # IP endpoint + allowlist still exist for the bastion/CI, but humans use DNS).
+  control_plane_endpoints_config {
+    dns_endpoint_config {
+      allow_external_traffic = true
+    }
+  }
+
   addons_config {
     horizontal_pod_autoscaling {
       disabled = false
