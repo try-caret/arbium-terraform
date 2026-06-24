@@ -42,8 +42,11 @@ resource "google_sql_database_instance" "this" {
       backup_retention_settings {
         retained_backups = var.backup_retention_days
       }
-      # PITR transaction log retention. Cloud SQL requires this to be <= backup_retention_days.
-      transaction_log_retention_days = var.backup_retention_days
+      # PITR transaction-log retention is capped by Cloud SQL at 1–7 days,
+      # independent of how many daily backups are retained (which can be up to
+      # 365). Clamp so a longer backup_retention_days (e.g. 30 for prod) doesn't
+      # exceed the transaction-log limit. (min(7,7)=7 → no change for staging.)
+      transaction_log_retention_days = min(var.backup_retention_days, 7)
       start_time                     = "07:00"
     }
 
