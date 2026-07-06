@@ -304,6 +304,12 @@ variable "arbium_namespace" {
   default     = "arbium"
 }
 
+variable "enable_capturelake" {
+  description = "Provision the CaptureLake S3 data bucket + IRSA role for the `chaindb-capturelake` KSA. Set when capturelake.enabled=true in the ChainDB chart values."
+  type        = bool
+  default     = false
+}
+
 variable "enable_reloader" {
   description = "Install Stakater Reloader (cluster-wide controller that rolls Deployments the ChainDB chart annotates when chaindb-runtime rotates). Required for secret-rotation self-heal; harmless no-op if no workload is annotated."
   type        = bool

@@ -230,6 +230,104 @@ resource "aws_iam_role_policy_attachment" "arbium_eso" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CaptureLake — S3 data bucket + IRSA for the `chaindb-capturelake` KSA
+#
+# CaptureLake (the chart's capturelake Deployment + derive CronJob) stores its
+# DuckLake Parquet on S3. The pod reaches S3 via IRSA (DuckDB's credential_chain
+# provider — no static keys), so this role is the only S3 credential. The
+# DuckLake catalog + derived store reuse the existing Aurora (separate databases,
+# created out of band) — nothing extra to provision for those here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resource "aws_s3_bucket" "capturelake" {
+  count  = var.enable_capturelake ? 1 : 0
+  bucket = "${var.name_prefix}-${var.environment}-capturelake"
+}
+
+resource "aws_s3_bucket_public_access_block" "capturelake" {
+  count                   = var.enable_capturelake ? 1 : 0
+  bucket                  = aws_s3_bucket.capturelake[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "capturelake" {
+  count  = var.enable_capturelake ? 1 : 0
+  bucket = aws_s3_bucket.capturelake[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+data "aws_iam_policy_document" "capturelake_assume" {
+  count = var.enable_capturelake ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:sub"
+      # KSA: `chaindb-capturelake` (fixed by the chart) in the chart namespace.
+      values = ["system:serviceaccount:${var.arbium_namespace}:chaindb-capturelake"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "capturelake_s3" {
+  count = var.enable_capturelake ? 1 : 0
+
+  statement {
+    sid       = "ListCapturelakeBucket"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [aws_s3_bucket.capturelake[0].arn]
+  }
+
+  statement {
+    sid       = "RWCapturelakeObjects"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.capturelake[0].arn}/*"]
+  }
+}
+
+resource "aws_iam_role" "capturelake" {
+  count              = var.enable_capturelake ? 1 : 0
+  name               = "${var.name_prefix}-${var.environment}-capturelake"
+  assume_role_policy = data.aws_iam_policy_document.capturelake_assume[0].json
+}
+
+resource "aws_iam_policy" "capturelake" {
+  count       = var.enable_capturelake ? 1 : 0
+  name        = "${var.name_prefix}-${var.environment}-capturelake"
+  description = "S3 read/write on the CaptureLake DuckLake bucket, assumed by the chaindb-capturelake KSA via IRSA"
+  policy      = data.aws_iam_policy_document.capturelake_s3[0].json
+}
+
+resource "aws_iam_role_policy_attachment" "capturelake" {
+  count      = var.enable_capturelake ? 1 : 0
+  role       = aws_iam_role.capturelake[0].name
+  policy_arn = aws_iam_policy.capturelake[0].arn
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NVIDIA Device Plugin
 # Required so embedder pods on g5/g6 nodes can request nvidia.com/gpu.
 # ─────────────────────────────────────────────────────────────────────────────

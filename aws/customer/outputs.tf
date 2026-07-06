@@ -68,6 +68,16 @@ output "arbium_eso_role_arn" {
   value       = var.enable_eso ? aws_iam_role.arbium_eso[0].arn : ""
 }
 
+output "capturelake_role_arn" {
+  description = "IRSA role ARN for the chart's `chaindb-capturelake` KSA. Pass to serviceAccount.capturelake.annotations[eks.amazonaws.com/role-arn]. Empty when enable_capturelake=false."
+  value       = var.enable_capturelake ? aws_iam_role.capturelake[0].arn : ""
+}
+
+output "capturelake_bucket" {
+  description = "S3 bucket holding the CaptureLake DuckLake Parquet. Use in capturelake.env.DATA_PATH (s3://<bucket>/lake/). Empty when enable_capturelake=false."
+  value       = var.enable_capturelake ? aws_s3_bucket.capturelake[0].bucket : ""
+}
+
 output "ingress_domain_name" {
   description = "Customer DNS name for the Arbium HTTPS ingress. Empty when create_ingress_certificate=false."
   value       = var.create_ingress_certificate ? var.ingress_domain_name : ""
