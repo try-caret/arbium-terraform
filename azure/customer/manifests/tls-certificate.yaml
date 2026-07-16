@@ -1,0 +1,21 @@
+# TLS Certificate for the ingress host. cert-manager issues this against the
+# letsencrypt ClusterIssuer and writes the keypair into the `chaindb-tls`
+# Secret, which ingress-nginx serves as its default-ssl-certificate (set by
+# addons.tf). This is why the shared chart Ingress needs no spec.tls block.
+#
+# Applied OUT-OF-BAND after terraform apply + cluster-issuer.yaml:
+#   kubectl apply -n arbium -f manifests/tls-certificate.yaml
+#
+# Replace <ingress-host> with `terraform output ingress_host` (<ip>.sslip.io).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: chaindb-tls
+  namespace: arbium
+spec:
+  secretName: chaindb-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - <ingress-host>

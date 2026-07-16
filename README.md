@@ -12,7 +12,7 @@ mirrored here with matching release tags.
 
 ```hcl
 module "arbium_aws" {
-  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.3.30"
+  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.3.32"
 
   # Set required variables here.
 }
@@ -24,7 +24,7 @@ See [aws/customer/README.md](aws/customer/README.md).
 
 ```hcl
 module "arbium_gcp" {
-  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.3.30"
+  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.3.32"
 
   # Set required variables here.
 }
@@ -32,10 +32,22 @@ module "arbium_gcp" {
 
 See [gcp/customer/README.md](gcp/customer/README.md).
 
+### Azure
+
+```hcl
+module "arbium_azure" {
+  source = "github.com/try-caret/arbium-terraform//azure/customer?ref=chaindb-v0.3.32"
+
+  # Set required variables here.
+}
+```
+
+See the [Azure deployment guide](https://idc.docs.arbium.ai/sOIf3iA42m51qblSJyLs/cloud-ops/2-terraform/azure-deployment).
+
 ## Versioning
 
 Release tags in this repository match Arbium release tags in the private source
-repository. Customers should pin `?ref=chaindb-v0.3.30` or another explicit
+repository. Customers should pin `?ref=chaindb-v0.3.32` or another explicit
 release tag, not `main`.
 
 ## What is included
@@ -43,12 +55,15 @@ release tag, not `main`.
 - `aws/customer`: AWS customer foundation root and local modules.
 - `gcp/customer`: GCP customer foundation root.
 - `gcp/modules`: shared GCP modules consumed by the customer root.
+- `azure/customer`: Azure customer foundation root.
+- `azure/modules`: shared Azure modules consumed by the customer root.
 
 The public mirror is intentionally minimal: the customer Terraform roots and
 shared modules (`*.tf`, `modules/`, `policies/`), `README.md`, `INSTALL.md`,
-`PLAN.md`, `envs/example.tfvars`, and `gcp/customer/docs/` customer docs.
+`PLAN.md`, `envs/example.tfvars`, and explicitly customer-safe documentation.
 Excluded: hosted-cloud Terraform (`infra/gcp/hosted`), all of `aws/customer/docs/`
 (internal — accounts/buckets/operator notes), internal test-run notes and dashboards,
+Azure's private operator runbook and secret gather-list,
 local `.tfvars` other than `envs/example.tfvars`, Helm `*.values*.yaml`, the
 operator backend wiring (`backend.tf`, `backends/`), Terraform state, generated
 local Terraform directories, and helper scripts.
