@@ -6,7 +6,9 @@
 # Applied OUT-OF-BAND after terraform apply + cluster-issuer.yaml:
 #   kubectl apply -n arbium -f manifests/tls-certificate.yaml
 #
-# Replace <ingress-host> with `terraform output ingress_host` (<ip>.sslip.io).
+# Replace <ingress-host> with the customer-owned production hostname configured
+# in DNS and Helm. For a temporary smoke test without customer DNS, use
+# `terraform output -raw ingress_host` (<ip>.sslip.io) instead.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

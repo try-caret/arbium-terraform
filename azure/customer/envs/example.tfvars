@@ -34,16 +34,19 @@ database_name    = "chaindb"
 postgres_version = "16"
 
 # CaptureLake (DuckLake store/derive layer) — Blob storage account + container,
-# capturelake/derived databases, Key Vault secrets. Off by default: the install
-# runs the captures-in-Postgres path unchanged. Flip on with the chart's
-# capturelake.enabled (INSTALL.md §10).
+# capturelake/derived databases, and Key Vault secrets. Leave this off unless
+# Arbium has supplied the matching CaptureLake chart values and database setup
+# procedure; the standard install keeps application data in PostgreSQL.
 capturelake_enabled            = false
 postgres_sku_name              = "B_Standard_B1ms"
 postgres_storage_mb            = 32768
 postgres_backup_retention_days = 7
 
-# Secret containers only. Populate values out-of-band in Key Vault.
-secret_names               = ["db", "scheduler", "scim", "gemini", "enrollment", "jwt", "registry", "license"]
+# Secret containers only. Populate values out-of-band in Key Vault. Add "scim"
+# when SCIM is enabled; also add "admin-client-id" and "admin-client-secret"
+# when enabling the fleet console. The database URL is created separately by
+# the PostgreSQL module.
+secret_names               = ["scheduler", "gemini", "enrollment", "jwt", "registry", "license"]
 key_vault_purge_protection = false
 
 # Ingress — static IP + <ip>.sslip.io host, TLS via cert-manager.

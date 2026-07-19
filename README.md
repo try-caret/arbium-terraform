@@ -12,7 +12,7 @@ mirrored here with matching release tags.
 
 ```hcl
 module "arbium_aws" {
-  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.3.32"
+  source = "github.com/try-caret/arbium-terraform//aws/customer?ref=chaindb-v0.3.33"
 
   # Set required variables here.
 }
@@ -24,7 +24,7 @@ See [aws/customer/README.md](aws/customer/README.md).
 
 ```hcl
 module "arbium_gcp" {
-  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.3.32"
+  source = "github.com/try-caret/arbium-terraform//gcp/customer?ref=chaindb-v0.3.33"
 
   # Set required variables here.
 }
@@ -36,18 +36,18 @@ See [gcp/customer/README.md](gcp/customer/README.md).
 
 ```hcl
 module "arbium_azure" {
-  source = "github.com/try-caret/arbium-terraform//azure/customer?ref=chaindb-v0.3.32"
+  source = "github.com/try-caret/arbium-terraform//azure/customer?ref=chaindb-v0.3.33"
 
   # Set required variables here.
 }
 ```
 
-See the [Azure deployment guide](https://idc.docs.arbium.ai/sOIf3iA42m51qblSJyLs/cloud-ops/2-terraform/azure-deployment).
+See the [Azure deployment guide](https://docs.arbium.ai/cloud-ops/azure-deployment/).
 
 ## Versioning
 
 Release tags in this repository match Arbium release tags in the private source
-repository. Customers should pin `?ref=chaindb-v0.3.32` or another explicit
+repository. Customers should pin `?ref=chaindb-v0.3.33` or another explicit
 release tag, not `main`.
 
 ## What is included
