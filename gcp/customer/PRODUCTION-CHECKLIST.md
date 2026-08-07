@@ -42,9 +42,9 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
 - [x] GPU embedder validated on L4: ONNX model loads on
       CUDAExecutionProvider in 2.3s, edge-fns hits POST /invocations,
       captures get assigned to episodes via centroid similarity.
-- [x] Fine-tuned model deployed: pulled v4fp16-2048 from
-      s3://caret-prod-sagemaker-models-us-east-1/caret-embedder/v4fp16-2048/
-      and baked into arbium-embedder-gpu:finetuned-v4fp16. Running on L4
+- [x] Fine-tuned model deployed: pulled v7 ONNX fp16/2048 from
+      s3://caret-prod-sagemaker-models-us-east-1/caret-embedder/v7-onnx-fp16-2048/
+      and baked into the digest-pinned GPU image. Running on L4
       with CUDAExecutionProvider in arbium-tftest. Ingest with real
       embeddings: 8 captures embedded + assigned in 267 ms.
 - [ ] Production decision: keep pulling from S3 at build time, or move
