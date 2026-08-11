@@ -310,6 +310,18 @@ variable "enable_capturelake" {
   default     = false
 }
 
+variable "enable_alb_access_logs" {
+  description = "Provision the S3 bucket the ingress ALB writes access logs to. The bucket alone does nothing — also set alb.ingress.kubernetes.io/load-balancer-attributes (access_logs.s3.*) in the chart's ingress.annotations, since the ALB is created by the load balancer controller and not by Terraform."
+  type        = bool
+  default     = false
+}
+
+variable "alb_access_logs_retention_days" {
+  description = "Days to keep ingress ALB access logs before expiry. Kept short: the logs are for request-level triage, not archival."
+  type        = number
+  default     = 30
+}
+
 variable "enable_reloader" {
   description = "Install Stakater Reloader (cluster-wide controller that rolls Deployments the ChainDB chart annotates when chaindb-runtime rotates). Required for secret-rotation self-heal; harmless no-op if no workload is annotated."
   type        = bool

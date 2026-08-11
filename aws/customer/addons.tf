@@ -230,6 +230,134 @@ resource "aws_iam_role_policy_attachment" "arbium_eso" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Ingress ALB access logs — S3 bucket only
+#
+# The ALB itself is created by the AWS Load Balancer Controller from the chart's
+# Ingress, so Terraform cannot set access_logs.s3.* on it. This provisions the
+# destination bucket; the per-cluster chart values must also carry
+#   alb.ingress.kubernetes.io/load-balancer-attributes:
+#     access_logs.s3.enabled=true,access_logs.s3.bucket=<this bucket>,access_logs.s3.prefix=alb
+# or the bucket just sits empty. Without access logs the only request-level
+# visibility is CloudWatch aggregates, which cannot attribute a request to a
+# client, path, or status code.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resource "aws_s3_bucket" "alb_access_logs" {
+  count  = var.enable_alb_access_logs ? 1 : 0
+  bucket = "${var.name_prefix}-${var.environment}-alb-logs"
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_access_logs" {
+  count                   = var.enable_alb_access_logs ? 1 : 0
+  bucket                  = aws_s3_bucket.alb_access_logs[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" {
+  count  = var.enable_alb_access_logs ? 1 : 0
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "alb_access_logs" {
+  count  = var.enable_alb_access_logs ? 1 : 0
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+
+  rule {
+    id     = "expire-alb-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "alb/"
+    }
+
+    expiration {
+      days = var.alb_access_logs_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 3
+    }
+  }
+}
+
+# Regions available before August 2022 (us-east-1 among them) require the
+# per-region ELB account as the log-delivery principal; newer regions use the
+# logdelivery service principal. Grant both so this works in either case.
+data "aws_elb_service_account" "current" {
+  count = var.enable_alb_access_logs ? 1 : 0
+}
+
+data "aws_iam_policy_document" "alb_access_logs" {
+  count = var.enable_alb_access_logs ? 1 : 0
+
+  statement {
+    sid       = "AWSLogDeliveryWriteRegionalELBAccount"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.alb_access_logs[0].arn}/alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [data.aws_elb_service_account.current[0].arn]
+    }
+  }
+
+  statement {
+    sid       = "AWSLogDeliveryWriteServicePrincipal"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.alb_access_logs[0].arn}/alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.alb_access_logs[0].arn,
+      "${aws_s3_bucket.alb_access_logs[0].arn}/*",
+    ]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_access_logs" {
+  count  = var.enable_alb_access_logs ? 1 : 0
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+  policy = data.aws_iam_policy_document.alb_access_logs[0].json
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CaptureLake — S3 data bucket + IRSA for the `chaindb-capturelake` KSA
 #
 # CaptureLake (the chart's capturelake Deployment + derive CronJob) stores its
