@@ -160,9 +160,9 @@ variable "gpu_node_instance_types" {
 }
 
 variable "gpu_node_ami_type" {
-  description = "AMI type for the optional embedder GPU managed node group. Use an EKS accelerated AMI so NVIDIA drivers/runtime are present."
+  description = "AMI type for the optional embedder GPU managed node group. Use an EKS accelerated AMI so NVIDIA drivers/runtime are present. AL2 GPU AMIs are unpublished since 2025-11 and absent for k8s 1.33+; use AL2023_x86_64_NVIDIA."
   type        = string
-  default     = "AL2_x86_64_GPU"
+  default     = "AL2023_x86_64_NVIDIA"
 }
 
 variable "gpu_node_min_size" {

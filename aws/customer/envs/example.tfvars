@@ -44,7 +44,7 @@ general_node_max_size       = 3
 # GPU embedder node group. Keep desired at 0 unless the account has GPU vCPU quota.
 # Set desired/max to 1+ to enable the GPU embedder path.
 gpu_node_instance_types = ["g4dn.xlarge"]
-gpu_node_ami_type       = "AL2_x86_64_GPU"
+gpu_node_ami_type       = "AL2023_x86_64_NVIDIA"
 gpu_node_min_size       = 0
 gpu_node_desired_size   = 0
 gpu_node_max_size       = 1
