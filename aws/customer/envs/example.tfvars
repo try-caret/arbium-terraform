@@ -27,7 +27,7 @@ interface_endpoint_services = [
   "bedrock",
 ]
 
-cluster_version                 = "1.31"
+cluster_version                 = "1.35"
 cluster_endpoint_public_access  = true
 cluster_endpoint_private_access = true
 

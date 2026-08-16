@@ -108,7 +108,7 @@ variable "interface_endpoint_services" {
 variable "cluster_version" {
   description = "EKS Kubernetes version."
   type        = string
-  default     = "1.31"
+  default     = "1.35"
 }
 
 variable "cluster_endpoint_public_access" {
