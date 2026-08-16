@@ -78,6 +78,11 @@ output "capturelake_bucket" {
   value       = var.enable_capturelake ? aws_s3_bucket.capturelake[0].bucket : ""
 }
 
+output "factory_runner_role_arn" {
+  description = "IRSA role ARN for the chart's `factory-runner` KSA (S3 scoped to factory-artifacts/*). Pass to factory.serviceAccount.annotations[eks.amazonaws.com/role-arn]. Empty when enable_factory=false."
+  value       = var.enable_factory ? aws_iam_role.factory_runner[0].arn : ""
+}
+
 output "ingress_domain_name" {
   description = "Customer DNS name for the Arbium HTTPS ingress. Empty when create_ingress_certificate=false."
   value       = var.create_ingress_certificate ? var.ingress_domain_name : ""

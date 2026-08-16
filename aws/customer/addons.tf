@@ -456,6 +456,99 @@ resource "aws_iam_role_policy_attachment" "capturelake" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Agent Factory — IRSA for the `factory-runner` KSA
+#
+# The factory's per-run Jobs (and the harness) read/write ONLY the
+# `factory-artifacts/*` prefix of the CaptureLake bucket — the shared object
+# store, but a scoped prefix, so the runner never sees the DuckLake data. This
+# is the IAM half of the chart's factory.yaml ServiceAccount annotation; the
+# chart declares the KSA + its role-arn annotation, this makes the role real.
+#
+# Per-cloud note (honest, not faked symmetry). The CHART is cloud-agnostic —
+# factory.serviceAccount.annotations is the identity seam. The INFRA differs by
+# each cloud's own model, matching how CaptureLake is done in each module:
+#   • AWS (here): a scoped IRSA role — fine-grained to the factory-artifacts/*
+#     prefix. This is that role.
+#   • Azure (infra/azure/customer/capturelake.tf): access is a storage-account
+#     connection string via Key Vault, not a prefix-scoped identity. The factory
+#     reuses that same CaptureLake storage credential (factory-artifacts/ is a
+#     path in the same container) — no separate role to add.
+#   • GCP (infra/gcp/customer): does not provision CaptureLake at all yet, so
+#     there is nothing to scope a factory identity to. It follows once that
+#     module gains CaptureLake — a real dependency, not a stub.
+# ─────────────────────────────────────────────────────────────────────────────
+
+data "aws_iam_policy_document" "factory_runner_assume" {
+  count = var.enable_factory ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:sub"
+      # KSA: `factory-runner` (chart default) in the factory namespace.
+      values = ["system:serviceaccount:${var.factory_namespace}:factory-runner"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "factory_runner_s3" {
+  count = var.enable_factory ? 1 : 0
+
+  # List, but only within the factory-artifacts/ prefix.
+  statement {
+    sid       = "ListFactoryArtifactsPrefix"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.capturelake[0].arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["factory-artifacts/*"]
+    }
+  }
+
+  statement {
+    sid       = "RWFactoryArtifactsObjects"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.capturelake[0].arn}/factory-artifacts/*"]
+  }
+}
+
+resource "aws_iam_role" "factory_runner" {
+  count              = var.enable_factory ? 1 : 0
+  name               = "${var.name_prefix}-${var.environment}-factory-runner"
+  assume_role_policy = data.aws_iam_policy_document.factory_runner_assume[0].json
+}
+
+resource "aws_iam_policy" "factory_runner" {
+  count       = var.enable_factory ? 1 : 0
+  name        = "${var.name_prefix}-${var.environment}-factory-runner"
+  description = "S3 read/write scoped to the factory-artifacts/* prefix of the CaptureLake bucket, assumed by the factory-runner KSA via IRSA"
+  policy      = data.aws_iam_policy_document.factory_runner_s3[0].json
+}
+
+resource "aws_iam_role_policy_attachment" "factory_runner" {
+  count      = var.enable_factory ? 1 : 0
+  role       = aws_iam_role.factory_runner[0].name
+  policy_arn = aws_iam_policy.factory_runner[0].arn
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NVIDIA Device Plugin
 # Required so embedder pods on g5/g6 nodes can request nvidia.com/gpu.
 # ─────────────────────────────────────────────────────────────────────────────

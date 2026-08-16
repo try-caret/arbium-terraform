@@ -310,6 +310,23 @@ variable "enable_capturelake" {
   default     = false
 }
 
+variable "enable_factory" {
+  description = "Provision the Agent Factory IRSA role (`factory-runner`) scoped to the `factory-artifacts/*` prefix of the CaptureLake bucket. Requires enable_capturelake (the prefix lives in that bucket). Set when factory.enabled=true in the ChainDB chart values."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.enable_factory || var.enable_capturelake
+    error_message = "enable_factory requires enable_capturelake — the factory-artifacts/ prefix lives in the CaptureLake bucket."
+  }
+}
+
+variable "factory_namespace" {
+  description = "Kubernetes namespace the factory-runner KSA lives in (matches factory.namespace in the chart)."
+  type        = string
+  default     = "agent-factory"
+}
+
 variable "enable_alb_access_logs" {
   description = "Provision the S3 bucket the ingress ALB writes access logs to. The bucket alone does nothing — also set alb.ingress.kubernetes.io/load-balancer-attributes (access_logs.s3.*) in the chart's ingress.annotations, since the ALB is created by the load balancer controller and not by Terraform."
   type        = bool
