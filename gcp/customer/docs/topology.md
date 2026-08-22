@@ -153,13 +153,14 @@ Do not put secret values in `.tfvars`, Terraform state, committed Helm values, o
 ```text
 Arbium client / operator smoke test
   -> chaindb-edge-fns service on GKE
-       -> Cloud SQL Postgres private IP
+       -> Cloud SQL Postgres private IP (auth, blocklist, SCIM)
        -> embedder service on GKE GPU node pool
-       -> Gemini API for drain-batch (until Bedrock/Vertex AI swap)
+       -> chaindb-capturelake service   (the capture store — required)
 
 Kubernetes CronJobs
-  -> chaindb-edge-fns /functions/v1 scheduled endpoints
-  -> Authorization: Bearer $CHAINDB_SCHEDULER_TOKEN
+  -> chaindb-capturelake-derive        -> LLM provider (episode synthesis)
+  -> chaindb-capturelake-maintenance   -> CHECKPOINT + compaction
+  -> chaindb-capturelake-search-reconcile
 ```
 
 ## Operational notes

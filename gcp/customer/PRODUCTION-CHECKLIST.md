@@ -50,10 +50,8 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
 - [ ] Production decision: keep pulling from S3 at build time, or move
       the model artifact to GCS so the customer GCP install doesn't have
       an AWS dependency for builds.
-- [ ] `/search` returns hits only after `drain-batch` summarizes episodes
-      into facts. Requires a working Gemini API key (today: arbium-tftest
-      drain-batch is in CrashLoopBackOff because the gemini Secret Manager
-      value is empty).
+- [ ] Search returns hits only after CaptureLake's derive job summarizes
+      episodes into facts. Requires a working LLM provider key.
 
 ### Migration runner idempotency
 - [x] Switched to Flyway-based `ChainDB/tools/chaindb-migrate`. Flyway tracks
@@ -160,16 +158,16 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
 - [ ] Customer data handling: confirm no PII gets into logs (Cloud Logging
       is retained; sanitize edge-fns log lines).
 
-### Scheduler + drain-batch
-- [ ] Populate `arbium-<env>-gemini` Secret Manager value with the
-      Gemini API key so `drain-batch` can summarize episodes.
-- [ ] Enable scheduler (`scheduler.enabled=true`) — CronJobs already in
-      chart; just needs the key + the right token plumbing.
-- [ ] Monitor `drain-batch` CronJob success rate; alert on consecutive
-      failures.
+### CaptureLake
+- [ ] Provision the object-store bucket plus the `capturelake` (DuckLake
+      catalog) and `derived` databases. Ingest writes here and nowhere else,
+      so uploads fail until this is in place.
+- [ ] Populate `arbium-<env>-gemini` Secret Manager value with the LLM
+      provider key so the derive job can summarize episodes.
+- [ ] Monitor the `chaindb-capturelake-derive` CronJob success rate; alert on
+      consecutive failures.
 - [ ] Decide on Bedrock vs Gemini for summarization; once Anthropic Bedrock
-      quotas are granted on AWS side, can flip via `EMBEDDER_PROVIDER` /
-      drain-batch config.
+      quotas are granted on AWS side, flip via the derive job's provider env.
 
 ## Tier 3 — nice-to-have
 
