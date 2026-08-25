@@ -274,7 +274,6 @@ externalSecrets:
   dataMappings:
     DATABASE_URL:                       arbium-<env>-db
     SUPABASE_DB_URL:                    arbium-<env>-db
-    CHAINDB_SCHEDULER_TOKEN:            arbium-<env>-scheduler
     ARBOR_AGENT_ENROLLMENT_SECRET:      arbium-<env>-enrollment
     ROOTS_INTUNE_PILOT_ENROLLMENT_SECRET: arbium-<env>-enrollment
     GEMINI_API_KEY:                     arbium-<env>-gemini
