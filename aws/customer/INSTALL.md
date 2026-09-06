@@ -283,7 +283,6 @@ externalSecrets:
     DATABASE_URL:                       arbium/<env>/db
     SUPABASE_DB_URL:                    arbium/<env>/db
     ARBOR_AGENT_ENROLLMENT_SECRET:      arbium/<env>/enrollment
-    ROOTS_INTUNE_PILOT_ENROLLMENT_SECRET: arbium/<env>/enrollment
     GEMINI_API_KEY:                     arbium/<env>/gemini
     JWT_SECRET:                         arbium/<env>/jwt
     ARBIUM_LICENSE_KEY:                 arbium/<env>/license
