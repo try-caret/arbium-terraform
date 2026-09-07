@@ -549,6 +549,117 @@ resource "aws_iam_role_policy_attachment" "factory_runner" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Admin UI — IRSA for the `admin-ui` KSA
+#
+# The dashboard reads and writes the same `factory-artifacts/*` prefix the
+# factory runner does, from the other side: the Active Agents page reads a
+# card's artifacts, Add composes its publish request out of the built skill/
+# tree, a merge mirrors the published tree back into plugin/ and archives it
+# under plugin-versions/, and a whole-team removal retires that archive.
+#
+# Why its own role rather than reusing factory_runner's: the trust policy is
+# what differs. That role is assumable only by the `factory-runner` KSA in the
+# factory namespace; this one only by `admin-ui` in the chart's namespace. The
+# S3 grants happen to match today, which is not a reason to let either
+# service assume the other's identity.
+#
+# Provisioned here rather than by hand: the chart points
+# serviceAccount.admin.annotations at this ARN, so without it a
+# terraform-driven rebuild produces no such role — the pod-identity webhook
+# still injects AWS_ROLE_ARN, AssumeRoleWithWebIdentity fails, artifact reads
+# degrade to null and publishing fails at the S3 mirror.
+#
+# NOTE s3:DeleteObject, and note how narrowly it is scoped. Read and write
+# cover the whole prefix; the delete covers ONLY */plugin-versions/*, because
+# the one operation that deletes is a withdrawal retiring a plugin's version
+# archive. The dashboard is a browser-facing console and the same prefix holds
+# the factory runner's own outputs, so it gets no delete rights over those.
+# Without the grant a withdrawal still succeeds — it is a database write — but
+# logs AccessDenied and leaves the archive behind, which is what makes a later
+# re-add of the same team collide with its own history.
+# ─────────────────────────────────────────────────────────────────────────────
+
+data "aws_iam_policy_document" "admin_ui_assume" {
+  count = var.enable_admin_artifacts ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:sub"
+      # KSA: `admin-ui` (serviceAccount.admin.name in the chart) in the
+      # namespace the ChainDB chart installs into.
+      values = ["system:serviceaccount:${var.arbium_namespace}:admin-ui"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer_host}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "admin_ui_s3" {
+  count = var.enable_admin_artifacts ? 1 : 0
+
+  # List, but only within the factory-artifacts/ prefix.
+  statement {
+    sid       = "ListFactoryArtifactsPrefix"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.capturelake[0].arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["factory-artifacts/*"]
+    }
+  }
+
+  statement {
+    sid       = "RWFactoryArtifactsObjects"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.capturelake[0].arn}/factory-artifacts/*"]
+  }
+
+  # Delete is scoped to the version archive alone — see the s3:DeleteObject
+  # note above. Nothing else the dashboard does removes an object.
+  statement {
+    sid       = "DeleteRetiredVersionArchives"
+    effect    = "Allow"
+    actions   = ["s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.capturelake[0].arn}/factory-artifacts/*/plugin-versions/*"]
+  }
+}
+
+resource "aws_iam_role" "admin_ui" {
+  count              = var.enable_admin_artifacts ? 1 : 0
+  name               = "${var.name_prefix}-${var.environment}-admin-ui"
+  assume_role_policy = data.aws_iam_policy_document.admin_ui_assume[0].json
+}
+
+resource "aws_iam_policy" "admin_ui" {
+  count       = var.enable_admin_artifacts ? 1 : 0
+  name        = "${var.name_prefix}-${var.environment}-admin-ui"
+  description = "S3 read/write/delete scoped to the factory-artifacts/* prefix of the CaptureLake bucket, assumed by the admin-ui KSA via IRSA"
+  policy      = data.aws_iam_policy_document.admin_ui_s3[0].json
+}
+
+resource "aws_iam_role_policy_attachment" "admin_ui" {
+  count      = var.enable_admin_artifacts ? 1 : 0
+  role       = aws_iam_role.admin_ui[0].name
+  policy_arn = aws_iam_policy.admin_ui[0].arn
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NVIDIA Device Plugin
 # Required so embedder pods on g5/g6 nodes can request nvidia.com/gpu.
 # ─────────────────────────────────────────────────────────────────────────────

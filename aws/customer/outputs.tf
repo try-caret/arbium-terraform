@@ -78,6 +78,11 @@ output "capturelake_bucket" {
   value       = var.enable_capturelake ? aws_s3_bucket.capturelake[0].bucket : ""
 }
 
+output "admin_ui_role_arn" {
+  description = "IRSA role ARN for the chart's `admin-ui` KSA (S3 read/write/delete scoped to factory-artifacts/*). Pass to serviceAccount.admin.annotations[eks.amazonaws.com/role-arn]. Empty when enable_admin_artifacts=false."
+  value       = var.enable_admin_artifacts ? aws_iam_role.admin_ui[0].arn : ""
+}
+
 output "factory_runner_role_arn" {
   description = "IRSA role ARN for the chart's `factory-runner` KSA (S3 scoped to factory-artifacts/*). Pass to factory.serviceAccount.annotations[eks.amazonaws.com/role-arn]. Empty when enable_factory=false."
   value       = var.enable_factory ? aws_iam_role.factory_runner[0].arn : ""

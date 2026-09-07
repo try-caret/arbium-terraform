@@ -321,6 +321,20 @@ variable "enable_factory" {
   }
 }
 
+variable "enable_admin_artifacts" {
+  description = "Provision the IRSA role for the chart's `admin-ui` KSA, scoped to the `factory-artifacts/*` prefix of the CaptureLake bucket (read and write, plus delete on the version archive — see the s3:DeleteObject note in addons.tf). Requires enable_capturelake, since the prefix lives in that bucket. Set when admin.enabled=true and admin.artifacts.bucket is set in the ChainDB chart values."
+  type        = bool
+  default     = false
+
+  # Same hard dependency as enable_factory, and the same reason to say so
+  # here: without this, the bucket's count=0 surfaces as "Invalid index" in
+  # addons.tf rather than naming the variable that is actually wrong.
+  validation {
+    condition     = !var.enable_admin_artifacts || var.enable_capturelake
+    error_message = "enable_admin_artifacts requires enable_capturelake — the factory-artifacts/ prefix lives in the CaptureLake bucket."
+  }
+}
+
 variable "factory_namespace" {
   description = "Kubernetes namespace the factory-runner KSA lives in (matches factory.namespace in the chart)."
   type        = string
