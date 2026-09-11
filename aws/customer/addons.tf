@@ -91,7 +91,7 @@ resource "helm_release" "lb_controller" {
       },
       {
         name  = "vpcId"
-        value = module.network.vpc_id
+        value = local.network.vpc_id
       },
       {
         name  = "serviceAccount.create"

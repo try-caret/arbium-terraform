@@ -20,9 +20,24 @@ locals {
   nat_gateway_count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.private_subnet_cidrs)) : 0
 
   interface_endpoints = var.enable_vpc_endpoints ? var.interface_endpoint_services : []
+
+  vpc_id             = aws_vpc.this[0].id
+  vpc_cidr           = aws_vpc.this[0].cidr_block
+  private_subnet_ids = [for subnet in aws_subnet.private : subnet.id]
+  public_subnet_ids  = [for subnet in aws_subnet.public : subnet.id]
+}
+
+# Preserve both historical singleton VPC state and the exploratory counted
+# address. This module always creates a network; the root now selects ownership.
+# Retaining count = 1 avoids reversing a migration some operators may have applied.
+moved {
+  from = aws_vpc.this
+  to   = aws_vpc.this[0]
 }
 
 resource "aws_vpc" "this" {
+  count = 1
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -35,7 +50,7 @@ resource "aws_vpc" "this" {
 resource "aws_internet_gateway" "this" {
   count = var.create_public_subnets ? 1 : 0
 
-  vpc_id = aws_vpc.this.id
+  vpc_id = local.vpc_id
 
   tags = merge(var.tags, {
     Name = "${local.name}-igw"
@@ -45,7 +60,7 @@ resource "aws_internet_gateway" "this" {
 resource "aws_subnet" "private" {
   for_each = local.private_subnets
 
-  vpc_id            = aws_vpc.this.id
+  vpc_id            = local.vpc_id
   cidr_block        = each.value.cidr
   availability_zone = each.value.az
 
@@ -58,7 +73,7 @@ resource "aws_subnet" "private" {
 resource "aws_subnet" "public" {
   for_each = local.public_subnets
 
-  vpc_id                  = aws_vpc.this.id
+  vpc_id                  = local.vpc_id
   cidr_block              = each.value.cidr
   availability_zone       = each.value.az
   map_public_ip_on_launch = false
@@ -72,7 +87,7 @@ resource "aws_subnet" "public" {
 resource "aws_route_table" "public" {
   count = var.create_public_subnets ? 1 : 0
 
-  vpc_id = aws_vpc.this.id
+  vpc_id = local.vpc_id
 
   tags = merge(var.tags, {
     Name = "${local.name}-public"
@@ -120,7 +135,7 @@ resource "aws_nat_gateway" "this" {
 resource "aws_route_table" "private" {
   for_each = local.private_subnets
 
-  vpc_id = aws_vpc.this.id
+  vpc_id = local.vpc_id
 
   tags = merge(var.tags, {
     Name = "${local.name}-private-${each.value.az}"
@@ -145,7 +160,7 @@ resource "aws_route_table_association" "private" {
 resource "aws_vpc_endpoint" "s3" {
   count = var.enable_vpc_endpoints ? 1 : 0
 
-  vpc_id            = aws_vpc.this.id
+  vpc_id            = local.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [for rt in aws_route_table.private : rt.id]
@@ -160,14 +175,14 @@ resource "aws_security_group" "endpoints" {
 
   name        = "${local.name}-vpc-endpoints"
   description = "Allow HTTPS from the Arbium VPC to interface endpoints"
-  vpc_id      = aws_vpc.this.id
+  vpc_id      = local.vpc_id
 
   ingress {
     description = "HTTPS from VPC"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    cidr_blocks = [local.vpc_cidr]
   }
 
   egress {
@@ -186,10 +201,10 @@ resource "aws_security_group" "endpoints" {
 resource "aws_vpc_endpoint" "interface" {
   for_each = local.interface_endpoints
 
-  vpc_id              = aws_vpc.this.id
+  vpc_id              = local.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.${each.key}"
   vpc_endpoint_type   = "Interface"
-  subnet_ids          = [for subnet in aws_subnet.private : subnet.id]
+  subnet_ids          = local.private_subnet_ids
   security_group_ids  = [aws_security_group.endpoints[0].id]
   private_dns_enabled = true
 

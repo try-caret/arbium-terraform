@@ -49,6 +49,62 @@ variable "vpc_cidr" {
   default     = "10.80.0.0/24"
 }
 
+variable "existing_network" {
+  description = "Use a customer-owned network instead of calling the network module. Routing, NAT, VPC DNS, endpoints and subnet tags remain customer-managed; all network-creation settings are ignored. Not an ownership-transfer mechanism for networks already in this state."
+  type = object({
+    vpc_id             = string
+    private_subnet_ids = list(string)
+    public_subnet_ids  = optional(list(string), [])
+  })
+  default = null
+
+  validation {
+    condition = var.existing_network == null ? true : (
+      can(regex("^vpc-([0-9a-f]{8}|[0-9a-f]{17})$", var.existing_network.vpc_id)) &&
+      length(var.existing_network.private_subnet_ids) >= 2 &&
+      length(distinct(var.existing_network.private_subnet_ids)) == length(var.existing_network.private_subnet_ids) &&
+      length(distinct(var.existing_network.public_subnet_ids)) == length(var.existing_network.public_subnet_ids) &&
+      length(setintersection(toset(var.existing_network.private_subnet_ids), toset(var.existing_network.public_subnet_ids))) == 0 &&
+      alltrue([for id in concat(var.existing_network.private_subnet_ids, var.existing_network.public_subnet_ids) : can(regex("^subnet-([0-9a-f]{8}|[0-9a-f]{17})$", id))])
+    )
+    error_message = "existing_network must contain a VPC ID, at least two distinct private subnet IDs, and distinct public subnet IDs; private and public lists must not overlap."
+  }
+}
+
+variable "ingress_scheme" {
+  description = "Application ingress scheme (also emitted in the Helm values hint). Internet-facing ingress requires supplied public subnets covering all worker AZs. Set internal for private ingress."
+  type        = string
+  default     = "internet-facing"
+
+  validation {
+    condition     = contains(["internet-facing", "internal"], var.ingress_scheme)
+    error_message = "ingress_scheme must be internet-facing or internal."
+  }
+}
+
+variable "create_public_hosted_zone" {
+  description = "Create a public zone named ingress_domain_name and its ACM validation record. Requires create_ingress_certificate. Parent delegation is managed separately by the domain owner."
+  type        = bool
+  default     = false
+}
+
+variable "ingress_alb" {
+  description = "Post-Helm ALB DNS name and canonical hosted-zone ID for an A alias in our public zone. Null during foundation provisioning; supply after the controller creates the ALB."
+  type = object({
+    dns_name = string
+    zone_id  = string
+  })
+  default = null
+
+  validation {
+    condition = var.ingress_alb == null ? true : (
+      can(regex("^[a-zA-Z0-9.-]+\\.elb\\.amazonaws\\.com(\\.cn)?\\.?$", var.ingress_alb.dns_name)) &&
+      can(regex("^Z[A-Z0-9]+$", var.ingress_alb.zone_id))
+    )
+    error_message = "ingress_alb requires the ALB's DNS hostname and its canonical hosted-zone ID (not the application's hosted-zone ID)."
+  }
+}
+
 variable "availability_zones" {
   description = "Availability zones to use. Leave empty to use the first three available AZs in aws_region."
   type        = list(string)

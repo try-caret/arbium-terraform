@@ -1,17 +1,17 @@
 output "vpc_id" {
-  value = aws_vpc.this.id
+  value = local.vpc_id
 }
 
 output "vpc_cidr_block" {
-  value = aws_vpc.this.cidr_block
+  value = local.vpc_cidr
 }
 
 output "private_subnet_ids" {
-  value = [for subnet in aws_subnet.private : subnet.id]
+  value = local.private_subnet_ids
 }
 
 output "public_subnet_ids" {
-  value = [for subnet in aws_subnet.public : subnet.id]
+  value = local.public_subnet_ids
 }
 
 output "private_route_table_ids" {

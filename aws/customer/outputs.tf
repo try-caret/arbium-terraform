@@ -1,16 +1,16 @@
 output "vpc_id" {
-  description = "Dedicated Arbium VPC ID."
-  value       = module.network.vpc_id
+  description = "Created or customer-supplied VPC ID."
+  value       = local.network.vpc_id
 }
 
 output "private_subnet_ids" {
   description = "Private subnet IDs for EKS nodes and Aurora."
-  value       = module.network.private_subnet_ids
+  value       = local.network.private_subnet_ids
 }
 
 output "public_subnet_ids" {
   description = "Public subnet IDs for internet-facing ALB/NAT, when enabled."
-  value       = module.network.public_subnet_ids
+  value       = local.network.public_subnet_ids
 }
 
 output "cluster_name" {
@@ -93,6 +93,16 @@ output "ingress_domain_name" {
   value       = var.create_ingress_certificate ? var.ingress_domain_name : ""
 }
 
+output "ingress_zone_id" {
+  description = "New public hosted-zone ID, or null when zone management is disabled. This is not the ALB's canonical hosted-zone ID."
+  value       = one(aws_route53_zone.ingress[*].zone_id)
+}
+
+output "ingress_zone_name_servers" {
+  description = "Actual AWS-assigned nameservers to hand to the domain owner after testing. This deployment never changes parent delegation."
+  value       = var.create_public_hosted_zone ? aws_route53_zone.ingress[0].name_servers : []
+}
+
 output "ingress_certificate_arn" {
   description = "ACM certificate ARN for the Arbium ALB ingress. Create the validation DNS records from ingress_certificate_validation_records before using it for HTTPS."
   value       = var.create_ingress_certificate ? aws_acm_certificate.ingress[0].arn : ""
@@ -118,7 +128,7 @@ output "helm_ingress_values_hint" {
       enabled        = true
       className      = "alb"
       host           = var.ingress_domain_name
-      scheme         = "internet-facing"
+      scheme         = var.ingress_scheme
       certificateArn = aws_acm_certificate.ingress[0].arn
     }
   }) : ""

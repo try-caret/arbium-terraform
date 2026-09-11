@@ -5,6 +5,25 @@ data "aws_availability_zones" "available" {
 locals {
   azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, 3)
 
+  # The ownership decision lives here, not in individual network resources.
+  # Use validated data-source IDs so downstream consumers depend on the checks.
+  network = var.existing_network == null ? {
+    vpc_id             = module.network[0].vpc_id
+    private_subnet_ids = module.network[0].private_subnet_ids
+    public_subnet_ids  = module.network[0].public_subnet_ids
+    } : {
+    vpc_id             = data.aws_vpc.existing[0].id
+    private_subnet_ids = [for id in var.existing_network.private_subnet_ids : data.aws_subnet.existing[id].id]
+    public_subnet_ids  = [for id in var.existing_network.public_subnet_ids : data.aws_subnet.existing[id].id]
+  }
+
+  existing_private_azs = var.existing_network == null ? toset([]) : toset([
+    for id in var.existing_network.private_subnet_ids : data.aws_subnet.existing[id].availability_zone
+  ])
+  existing_public_azs = var.existing_network == null ? toset([]) : toset([
+    for id in var.existing_network.public_subnet_ids : data.aws_subnet.existing[id].availability_zone
+  ])
+
   # The module deliberately does NOT emit an `environment` tag. It emits
   # `deployment` (the cluster name) as its per-stack identifier instead, so the
   # module's keys never overlap with caller-supplied keys like `environment`,
@@ -22,7 +41,51 @@ locals {
   )
 }
 
+data "aws_subnet" "existing" {
+  for_each = var.existing_network == null ? toset([]) : toset(concat(var.existing_network.private_subnet_ids, var.existing_network.public_subnet_ids))
+  id       = each.value
+
+  lifecycle {
+    postcondition {
+      condition     = self.vpc_id == var.existing_network.vpc_id
+      error_message = "Every supplied subnet must belong to existing_network.vpc_id."
+    }
+  }
+}
+
+data "aws_vpc" "existing" {
+  count = var.existing_network == null ? 0 : 1
+  id    = var.existing_network.vpc_id
+
+  lifecycle {
+    precondition {
+      condition     = length(local.existing_private_azs) >= 2
+      error_message = "Supplied private subnets must span at least two availability zones for EKS and Aurora."
+    }
+    precondition {
+      condition = var.ingress_scheme == "internal" || (
+        length(local.existing_public_azs) >= 2 &&
+        length(local.existing_public_azs) == length(var.existing_network.public_subnet_ids) &&
+        length(setsubtract(local.existing_private_azs, local.existing_public_azs)) == 0
+      )
+      error_message = "Internet-facing ingress needs one supplied public subnet per ALB AZ, at least two AZs, covering every private worker AZ."
+    }
+    postcondition {
+      condition     = self.enable_dns_support && self.enable_dns_hostnames
+      error_message = "The supplied VPC must have DNS support and DNS hostnames enabled by its owner."
+    }
+  }
+}
+
+# Move the whole module, preserving all previously managed resource addresses.
+# The module's existing VPC move also covers pre-count singleton VPC state.
+moved {
+  from = module.network
+  to   = module.network[0]
+}
+
 module "network" {
+  count  = var.existing_network == null ? 1 : 0
   source = "./modules/network"
 
   name_prefix                 = var.name_prefix
@@ -45,8 +108,8 @@ module "eks" {
   name_prefix                     = var.name_prefix
   environment                     = var.environment
   cluster_version                 = var.cluster_version
-  vpc_id                          = module.network.vpc_id
-  subnet_ids                      = module.network.private_subnet_ids
+  vpc_id                          = local.network.vpc_id
+  subnet_ids                      = local.network.private_subnet_ids
   cluster_endpoint_public_access  = var.cluster_endpoint_public_access
   cluster_endpoint_private_access = var.cluster_endpoint_private_access
   general_node_instance_types     = var.general_node_instance_types
@@ -112,8 +175,8 @@ module "aurora" {
 
   name_prefix                = var.name_prefix
   environment                = var.environment
-  vpc_id                     = module.network.vpc_id
-  subnet_ids                 = module.network.private_subnet_ids
+  vpc_id                     = local.network.vpc_id
+  subnet_ids                 = local.network.private_subnet_ids
   eks_node_security_group_id = module.eks.node_security_group_id
   database_name              = var.database_name
   engine_version             = var.aurora_engine_version
