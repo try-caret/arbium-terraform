@@ -455,7 +455,7 @@ data "aws_iam_policy_document" "capturelake_assume" {
   }
 }
 
-data "aws_iam_policy_document" "capturelake_s3" {
+data "aws_iam_policy_document" "capturelake" {
   count = var.enable_capturelake ? 1 : 0
 
   statement {
@@ -471,6 +471,16 @@ data "aws_iam_policy_document" "capturelake_s3" {
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.capturelake[0].arn}/*"]
   }
+
+  # The maintenance CronJob samples the database's CPU and capacity into its own telemetry, so a
+  # ramp that is really a database ceiling reads as one. CloudWatch's read APIs take no resource
+  # ARN, so "*" is the only form this grant has; it carries no write and no other namespace.
+  statement {
+    sid       = "ReadDatabaseCapacityMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:GetMetricData"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role" "capturelake" {
@@ -480,10 +490,13 @@ resource "aws_iam_role" "capturelake" {
 }
 
 resource "aws_iam_policy" "capturelake" {
-  count       = var.enable_capturelake ? 1 : 0
-  name        = "${var.name_prefix}-${var.environment}-capturelake"
+  count = var.enable_capturelake ? 1 : 0
+  name  = "${var.name_prefix}-${var.environment}-capturelake"
+  # Also grants cloudwatch:GetMetricData — see the policy document. The description stays as it is
+  # on purpose: the provider forces a replacement when it changes, which would detach the role's S3
+  # access while the policy is recreated.
   description = "S3 read/write on the CaptureLake DuckLake bucket, assumed by the chaindb-capturelake KSA via IRSA"
-  policy      = data.aws_iam_policy_document.capturelake_s3[0].json
+  policy      = data.aws_iam_policy_document.capturelake[0].json
 }
 
 resource "aws_iam_role_policy_attachment" "capturelake" {
