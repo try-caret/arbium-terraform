@@ -391,6 +391,43 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "capturelake" {
   }
 }
 
+# The DuckLake catalog rows live in Aurora; a PITR of Aurora is only a whole
+# restore if the Parquet files it points at still exist, so old object versions
+# are kept exactly as long as Aurora's own backups. Maintenance deletes retired
+# files after RETIRED_FILE_GRACE (CaptureLake/src/duck.ts), which leaves a
+# delete marker on the key; restoring the catalog to time T therefore also
+# means removing every delete marker created after T (list-object-versions,
+# then delete-object --version-id on each DeleteMarkers entry).
+resource "aws_s3_bucket_versioning" "capturelake" {
+  count  = var.enable_capturelake ? 1 : 0
+  bucket = aws_s3_bucket.capturelake[0].id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "capturelake" {
+  count  = var.enable_capturelake ? 1 : 0
+  bucket = aws_s3_bucket.capturelake[0].id
+
+  depends_on = [aws_s3_bucket_versioning.capturelake]
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = var.aurora_backup_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 3
+    }
+  }
+}
+
 data "aws_iam_policy_document" "capturelake_assume" {
   count = var.enable_capturelake ? 1 : 0
 
