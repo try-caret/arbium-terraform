@@ -515,7 +515,7 @@ kubectl wait deployment -n arbium --for=condition=available --timeout=15m --all
 # Option B — patch the stuck release secret status to "failed":
 python3 -c "
 import base64, gzip, json, subprocess
-data = subprocess.run(['kubectl','--kubeconfig=...','-n','arbium','get','secret',
+data = subprocess.run(['kubectl','-n','arbium','get','secret',
   'sh.helm.release.v1.arbium.v1','-o','jsonpath={.data.release}'],
   capture_output=True, text=True).stdout
 obj = json.loads(gzip.decompress(base64.b64decode(base64.b64decode(data))))

@@ -159,7 +159,9 @@ Arbium client / operator smoke test
 
 Kubernetes CronJobs
   -> chaindb-capturelake-derive        -> LLM provider (episode synthesis)
-  -> chaindb-capturelake-maintenance   -> CHECKPOINT + compaction
+  -> chaindb-capturelake-flush         -> every 5 min: inlined rows -> Parquet
+  -> chaindb-capturelake-compact       -> every 30 min: flush + merge files
+  -> chaindb-capturelake-maintenance   -> daily: compact + snapshot expiry + file deletion
   -> chaindb-capturelake-search-reconcile
 ```
 
