@@ -125,6 +125,28 @@ cd "$TFROOT"
 terraform init -reconfigure
 ```
 
+**Upgrading an existing deployment from AWS provider 5.x:** this release requires
+`>=6.46.0`. Follow the [provider 6 migration procedure](README.md#upgrading-from-aws-provider-5x),
+including its pre-upgrade checks and state protection. Use explicit upgrade initialization
+with the authoritative backend for the same environment as your existing tfvars:
+
+```bash
+terraform init -upgrade -reconfigure -backend-config=/secure/path/ENV.s3.hcl
+terraform validate
+terraform plan -var-file=/secure/path/ENV.tfvars -out=/secure/path/ENV.tfplan
+terraform show /secure/path/ENV.tfplan
+```
+
+Omit `-backend-config` only if your own `backend.tf` already contains the complete
+correct backend. Review the provider lock changes and the entire plan before any
+approved apply. Do not substitute example tfvars for an existing deployment or switch
+state keys to bypass an initialization error.
+
+For the optional queue feature, use a published queue-capable chart/image release and
+follow [queued upload recovery](QUEUE_RECOVERY.md). Provisioning alone enables neither
+application flag. Configure attended alerts and verify consumer health before edge
+publication; disable publication first and drain accepted work on rollback.
+
 Create a tfvars file (copy `envs/example.tfvars` and edit; keep it outside
 git). Two network modes:
 

@@ -62,6 +62,45 @@ chart is installed from the pinned published release
 packaged cloud preset (e.g. the chart's `values-aws.yaml`, obtained via
 `helm pull`) plus your local values layered on top.
 
+## Upgrading from AWS provider 5.x
+
+This root now requires **AWS provider >=6.46.0** (including support for 1-MiB SQS
+messages), even when queue provisioning remains off. An existing 5.x selection in
+`.terraform.lock.hcl` is incompatible; `init -reconfigure` alone does not upgrade it.
+Read the [AWS provider 6 upgrade guide](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/version-6-upgrade).
+In your previous release, first update to the latest compatible 5.x and resolve its
+applicable deprecations. Review the v6 breaking changes against all managed resources.
+
+Before upgrading, confirm the account and region, preserve the existing state through
+your approved backup/versioning procedure, and obtain the authoritative backend and
+**matching** environment tfvars. Never reconstruct them from guessed defaults.
+From this release's root, with your existing backend declaration:
+
+```bash
+terraform init -upgrade -reconfigure -backend-config=/secure/path/ENV.s3.hcl
+terraform validate
+terraform plan -var-file=/secure/path/ENV.tfvars -out=/secure/path/ENV.tfplan
+terraform show /secure/path/ENV.tfplan
+```
+
+If your backend is fully configured in your own `backend.tf`, omit only the
+`-backend-config` argument. `-reconfigure` selects that backend; it is not approval
+to migrate state. `-upgrade` can upgrade **all** providers/modules allowed by the
+constraints, so review every lockfile change and the full infrastructure plan,
+including replacements, deletions, IAM and defaults. Stop on unexplained changes.
+Protect plan files as sensitive. Apply only the reviewed saved plan after explicit
+operator approval; do not combine initialization with an automatic apply. Retain the
+reviewed lockfile with your deployment configuration (the public mirror excludes it).
+
+## Optional queued uploads
+
+Provisioning is opt-in (`enable_capture_queue=false` by default) and does not turn on
+application publication or consumption. See [queued upload recovery](QUEUE_RECOVERY.md)
+for workload configuration, attended native alerts, finite retention, rollback/drain
+and controlled dead-letter replay. The same public procedure covers GCP Pub/Sub.
+Publish the matching public documentation before applying alert definitions that link
+to it. Use a release that includes queue support, not an older example chart pin.
+
 ## Secret handling
 
 Terraform creates empty Secrets Manager containers using this naming pattern:

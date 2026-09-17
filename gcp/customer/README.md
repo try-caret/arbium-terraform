@@ -34,6 +34,16 @@ terraform plan -var-file=envs/<environment>.tfvars
 
 For a real customer environment, copy `envs/example.tfvars` to an untracked file and adjust values. Do not put secret values in `.tfvars`.
 
+## Optional queued uploads
+
+The `capture_queue` object is opt-in (default `null`). It provisions Pub/Sub source
+and dead-letter subscriptions, workload/service-agent permissions and attended
+native alerts; application publication and consumption remain separate default-off
+Helm settings. See the shared [queued upload recovery procedure](../../aws/customer/QUEUE_RECOVERY.md)
+for enablement, finite retention, alert response, rollback/drain and controlled replay.
+That document ships in the same public mirror for both AWS and GCP; publish it before
+applying alert definitions that link to its public URL.
+
 ## Secret handling
 
 Terraform creates empty Secret Manager containers such as:
