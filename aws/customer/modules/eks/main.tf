@@ -182,6 +182,68 @@ resource "aws_eks_node_group" "gpu" {
   depends_on = [aws_iam_role_policy_attachment.nodes]
 }
 
+# A node of its own for the CaptureLake writer, where a deployment asks for one. ADDITIVE: desired 0
+# renders no node group at all, so an existing cluster sees no plan at all until it opts in, and the
+# general group is never resized or retyped (changing its instance type replaces every node on it).
+#
+# The writer is the one pod sized by how much data it re-merges rather than by how many requests it
+# serves. The compact rewrites each person's whole day into one file, so its peak grows through the
+# day AND with the fleet: measured on arbium-prod, 1.76 GB at 18:45 UTC on 2026-09-17 and 4.05 GB by
+# 07:45 the next morning with HALF the people. Sharing an m6i.large (~7.1Gi allocatable) caps the
+# writer near 6Gi, and 6Gi is not enough room for the fleet to keep growing.
+#
+# Memory-optimised by default (r6i.2xlarge: 64 GiB, 8 vCPU) because that is the axis that binds —
+# CPU throttling on the writer has been ~zero throughout. An m6i.4xlarge is the same memory for
+# 52% more money and twice the cores nobody is using.
+#
+# Tainted, not merely labelled: an unrelated pod scheduled here would put the ceiling back, which is
+# the whole problem this removes. The chart's capturelake nodeSelector + tolerations are what opt
+# the writer (and its maintenance CronJobs) in.
+resource "aws_eks_node_group" "lake" {
+  count = var.lake_node_desired_size > 0 ? 1 : 0
+
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "capturelake"
+  node_role_arn   = aws_iam_role.nodes.arn
+  subnet_ids      = var.subnet_ids
+  instance_types  = var.lake_node_instance_types
+  capacity_type   = "ON_DEMAND"
+
+  dynamic "launch_template" {
+    for_each = var.enable_node_launch_template ? [1] : []
+    content {
+      id      = aws_launch_template.node[0].id
+      version = aws_launch_template.node[0].latest_version
+    }
+  }
+
+  scaling_config {
+    min_size     = var.lake_node_min_size
+    desired_size = var.lake_node_desired_size
+    max_size     = var.lake_node_max_size
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  labels = {
+    workload = "capturelake"
+  }
+
+  taint {
+    key    = "workload"
+    value  = "capturelake"
+    effect = "NO_SCHEDULE"
+  }
+
+  tags = merge(var.tags, {
+    Name = "${local.cluster_name}-capturelake"
+  })
+
+  depends_on = [aws_iam_role_policy_attachment.nodes]
+}
+
 resource "aws_eks_addon" "this" {
   for_each = toset([
     "vpc-cni",
@@ -218,6 +280,7 @@ resource "aws_eks_addon" "this" {
   depends_on = [
     aws_eks_node_group.general,
     aws_eks_node_group.gpu,
+    aws_eks_node_group.lake,
   ]
 }
 

@@ -121,6 +121,10 @@ module "eks" {
   gpu_node_min_size               = var.gpu_node_min_size
   gpu_node_desired_size           = var.gpu_node_desired_size
   gpu_node_max_size               = var.gpu_node_max_size
+  lake_node_instance_types        = var.lake_node_instance_types
+  lake_node_min_size              = var.lake_node_min_size
+  lake_node_desired_size          = var.lake_node_desired_size
+  lake_node_max_size              = var.lake_node_max_size
   enable_node_launch_template     = var.enable_node_launch_template
   tags                            = local.tags
 }

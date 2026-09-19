@@ -239,6 +239,34 @@ variable "gpu_node_max_size" {
   default     = 2
 }
 
+# --- Optional dedicated node group for the CaptureLake writer.
+# Off by default: desired 0 renders nothing, so an existing deployment sees no change until it opts
+# in. The writer's memory is set by how much data its compact re-merges (each run rewrites every
+# active person's whole day), so it outgrows a shared general node long before its CPU matters.
+variable "lake_node_instance_types" {
+  description = "Instance types for the optional CaptureLake writer node group. Memory-optimised on purpose: the writer's compact is memory-bound and barely uses CPU. r6i.2xlarge is 64 GiB / 8 vCPU; m6i.4xlarge is the same memory for ~52% more."
+  type        = list(string)
+  default     = ["r6i.2xlarge"]
+}
+
+variable "lake_node_min_size" {
+  type        = number
+  description = "Minimum CaptureLake node count."
+  default     = 1
+}
+
+variable "lake_node_desired_size" {
+  type        = number
+  description = "Desired CaptureLake node count. 0 (the default) creates no node group — the opt-in switch. The writer is a single pod, so 1 is the working value; >1 only buys a spare for node replacement."
+  default     = 0
+}
+
+variable "lake_node_max_size" {
+  type        = number
+  description = "Maximum CaptureLake node count."
+  default     = 2
+}
+
 variable "enable_nvidia_device_plugin" {
   type        = bool
   description = "Install the NVIDIA Kubernetes device plugin on GPU nodes so pods can request nvidia.com/gpu."

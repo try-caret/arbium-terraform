@@ -14,6 +14,11 @@ variable "gpu_node_ami_type" { type = string }
 variable "gpu_node_min_size" { type = number }
 variable "gpu_node_desired_size" { type = number }
 variable "gpu_node_max_size" { type = number }
+variable "lake_node_instance_types" { type = list(string) }
+variable "lake_node_min_size" { type = number }
+# 0 renders no node group at all — the opt-in switch for the whole thing.
+variable "lake_node_desired_size" { type = number }
+variable "lake_node_max_size" { type = number }
 variable "tags" {
   type    = map(string)
   default = {}
