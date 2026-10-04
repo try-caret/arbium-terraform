@@ -394,6 +394,12 @@ variable "enable_capturelake" {
   default     = false
 }
 
+variable "capturelake_llm_role_arn" {
+  description = "A role in another AWS account that serves this install's models (the chart's BEDROCK_ROLE_ARN). Lets the CaptureLake IRSA role assume it; that role's own trust policy must name the CaptureLake role too. Null = models are reached some other way."
+  type        = string
+  default     = null
+}
+
 variable "enable_factory" {
   description = "Provision the Agent Factory IRSA role (`factory-runner`) scoped to the `factory-artifacts/*` prefix of the CaptureLake bucket. Requires enable_capturelake (the prefix lives in that bucket). Set when factory.enabled=true in the ChainDB chart values."
   type        = bool

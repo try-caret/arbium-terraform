@@ -466,6 +466,18 @@ data "aws_iam_policy_document" "capturelake" {
     actions   = ["cloudwatch:GetMetricData"]
     resources = ["*"]
   }
+
+  # The eventlog crons' model calls go to a Bedrock in another account: they assume that
+  # account's role for those calls only (BEDROCK_ROLE_ARN in the chart values).
+  dynamic "statement" {
+    for_each = var.capturelake_llm_role_arn == null ? [] : [var.capturelake_llm_role_arn]
+    content {
+      sid       = "AssumeLlmRole"
+      effect    = "Allow"
+      actions   = ["sts:AssumeRole"]
+      resources = [statement.value]
+    }
+  }
 }
 
 resource "aws_iam_role" "capturelake" {
