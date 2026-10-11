@@ -165,7 +165,9 @@ State as of `feat/add-gcp-deployment` head. Tick off as work lands.
 - [ ] Populate `arbium-<env>-gemini` Secret Manager value with the LLM
       provider key so the derive job can summarize episodes.
 - [ ] Monitor the `chaindb-capturelake-derive` CronJob success rate; alert on
-      consecutive failures.
+      consecutive failures. If derive runs on the Argo engine
+      (`capturelake.pipeline.engine.derive: argo`), it is a Workflow instead:
+      watch `kubectl -n arbium get workflows` and `get cronworkflow`.
 - [ ] Decide on Bedrock vs Gemini for summarization; once Anthropic Bedrock
       quotas are granted on AWS side, flip via the derive job's provider env.
 

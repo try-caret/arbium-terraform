@@ -763,6 +763,9 @@ kubectl -n arbium logs deploy/chaindb-capturelake --tail=20
 kubectl -n arbium get jobs | grep capturelake   # audit rotation by job exit code, not pod Ready
 ```
 
+Jobs moved to the Argo engine (`capturelake.pipeline.engine.<job>: argo`) run as Workflows: check
+`kubectl -n arbium get workflows` (and `get cronworkflow`) for those instead.
+
 ### Provision identities via the SCIM API (no Entra changes)
 
 Identities arrive via the SCIM service (`/scim/v2` on the ingress host). Use
@@ -832,6 +835,9 @@ stays Ready while silently dropping writes:
 ```bash
 kubectl -n arbium get jobs | grep capturelake
 ```
+
+Jobs moved to the Argo engine (`capturelake.pipeline.engine.<job>: argo`) run as Workflows: check
+`kubectl -n arbium get workflows` (and `get cronworkflow`) for those instead.
 
 Post-roll assertion:
 
