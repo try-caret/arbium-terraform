@@ -797,8 +797,8 @@ curl -fsS --resolve <ingress-domain>:443:$ALB_IP \
   -d '{"displayName":"<group-name>","externalId":"<approved-group-guid>","members":[{"value":"<scim-user-id-from-step-1>"}]}'
 ```
 
-Group GUIDs must match the values file's `scim.scimUserGroupIds` /
-`scimAdminGroupIds`. Any credential rotation is coordinated at cutover so the
+Group GUIDs must match the seat and admin groups set in the database
+(the chart's INSTALL.md, "Seat and admin groups"). Any credential rotation is coordinated at cutover so the
 live integration never breaks; nothing in Entra changes before handoff.
 
 **Browser/OIDC testing before delegation.** For admin/SCIM login flows that
