@@ -145,5 +145,5 @@ resource "google_service_account_iam_member" "cloudsql_proxy_wi" {
 
   service_account_id = google_service_account.cloudsql_proxy[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.proxy_workload_identity_namespace}/${var.proxy_workload_identity_ksa_name}]"
+  member             = "serviceAccount:${var.workload_identity_pool}[${var.proxy_workload_identity_namespace}/${var.proxy_workload_identity_ksa_name}]"
 }

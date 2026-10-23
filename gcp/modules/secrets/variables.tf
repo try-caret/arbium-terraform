@@ -36,3 +36,13 @@ variable "eso_workload_identity_ksa_name" {
   type        = string
   default     = "eso"
 }
+
+variable "workload_identity_pool" {
+  description = "The cluster's Workload Identity pool (the gke module's workload_identity_pool output, <project>.svc.id.goog). Taken from the cluster rather than built from the project id so the External Secrets Operator binding is ordered after the cluster that creates the pool."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^\\[\\]/]+\\.svc\\.id\\.goog$", var.workload_identity_pool))
+    error_message = "workload_identity_pool must be a Workload Identity pool name of the form <project>.svc.id.goog (the gke module's workload_identity_pool output)."
+  }
+}

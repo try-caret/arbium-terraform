@@ -39,5 +39,5 @@ resource "google_service_account_iam_member" "eso_wi" {
 
   service_account_id = google_service_account.eso[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.eso_workload_identity_namespace}/${var.eso_workload_identity_ksa_name}]"
+  member             = "serviceAccount:${var.workload_identity_pool}[${var.eso_workload_identity_namespace}/${var.eso_workload_identity_ksa_name}]"
 }

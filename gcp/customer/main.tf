@@ -72,6 +72,7 @@ module "cloudsql" {
   backup_retention_days    = var.cloudsql_backup_retention_days
   deletion_protection      = var.cloudsql_deletion_protection
   create_admin_user        = var.cloudsql_create_admin_user
+  workload_identity_pool   = module.gke.workload_identity_pool
   labels                   = local.labels
 
   depends_on = [module.network]
@@ -80,11 +81,12 @@ module "cloudsql" {
 module "secrets" {
   source = "../modules/secrets"
 
-  project_id   = var.project_id
-  name_prefix  = var.name_prefix
-  environment  = var.environment
-  secret_names = var.secret_names
-  labels       = local.labels
+  project_id             = var.project_id
+  name_prefix            = var.name_prefix
+  environment            = var.environment
+  secret_names           = var.secret_names
+  labels                 = local.labels
+  workload_identity_pool = module.gke.workload_identity_pool
 }
 
 # Reserved global external IP for the GCE Ingress. The LB IP survives chart

@@ -20,7 +20,7 @@ resource "google_service_account_iam_member" "capture_queue_wi" {
   }
   service_account_id = "projects/${var.project_id}/serviceAccounts/${each.value.email}"
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.capture_queue.namespace}/${each.value.ksa}]"
+  member             = "serviceAccount:${module.gke.workload_identity_pool}[${var.capture_queue.namespace}/${each.value.ksa}]"
 }
 
 module "capture_queue" {

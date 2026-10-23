@@ -11,6 +11,11 @@ output "cluster_ca_certificate" {
   sensitive = true
 }
 
+# The cluster's DNS-based control plane endpoint (host name only), or null when the cluster has none.
+output "cluster_dns_endpoint" {
+  value = one(flatten(google_container_cluster.this.control_plane_endpoints_config[*].dns_endpoint_config[*].endpoint))
+}
+
 output "cluster_location" {
   value = google_container_cluster.this.location
 }
