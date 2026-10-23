@@ -560,6 +560,12 @@ The extension statements are idempotent. The chart's `capturelake` Deployment ru
 DuckLake catalog migrations on start, and `capturelake.schemaInit` owns the
 derived Postgres schema (it also runs the same `CREATE EXTENSION IF NOT
 EXISTS`, so the explicit step above is a belt-and-braces no-op afterwards).
+It applies the schema only when it differs from the version it last recorded in the
+`capturelake_schema_state` table of the `derived` database, so a restart does not repair
+changes made to that schema by hand. After editing it by hand, and after rolling back to
+an earlier chart version (before 0.7.6) and then forward again, run
+`delete from capturelake_schema_state;` in `derived` and restart the `capturelake`
+Deployment to apply it again.
 
 ### 6c. Agent Factory roles
 
