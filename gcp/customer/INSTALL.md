@@ -475,7 +475,7 @@ helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
 ```
 
 Migrations run automatically on the next edge-fns pod rollout (via
-initContainer). For chart-version changelog see `charts/chaindb/Chart.yaml`.
+initContainer). Chart versions are the `chaindb-v*` release tags.
 
 ---
 

@@ -33,13 +33,13 @@ cd infra/aws/customer
 terraform apply -var-file=envs/<env>.tfvars
 aws eks update-kubeconfig --name <cluster> --region us-east-1
 
-helm upgrade --install arbium charts/chaindb \
+helm pull oci://ghcr.io/try-caret/charts/chaindb --version <release-version> \
+  --untar --untardir chaindb-<release-version>
+helm upgrade --install arbium ./chaindb-<release-version>/chaindb \
   --namespace arbium --create-namespace \
-  -f charts/chaindb/values-aws.yaml \
-  -f charts/chaindb/<env>.values.local.yaml
+  -f chaindb-<release-version>/chaindb/values-aws.yaml \
+  -f <env>.values.local.yaml
 ```
-
-(`helm upgrade --install` here is shown against a local checkout; the customer path is `oci://ghcr.io/try-caret/charts/chaindb --version <release-version>`.)
 
 **GCP:**
 ```bash
@@ -51,10 +51,12 @@ gcloud services enable compute container sqladmin servicenetworking \
 terraform apply -var-file=envs/<env>.tfvars
 gcloud container clusters get-credentials <cluster> --region us-east1 --project <project>
 
-helm upgrade --install arbium charts/chaindb \
+helm pull oci://ghcr.io/try-caret/charts/chaindb --version <release-version> \
+  --untar --untardir chaindb-<release-version>
+helm upgrade --install arbium ./chaindb-<release-version>/chaindb \
   --namespace arbium --create-namespace \
-  -f charts/chaindb/values-gcp.yaml \
-  -f charts/chaindb/<env>.values.local.yaml
+  -f chaindb-<release-version>/chaindb/values-gcp.yaml \
+  -f <env>.values.local.yaml
 ```
 
 ## Things that work the same
