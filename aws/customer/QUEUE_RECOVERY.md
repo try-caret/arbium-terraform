@@ -129,7 +129,14 @@ volatile and limited; it is not protected by server queue retention.
 5. An invalidated connection makes `/healthz` fail and retries opening every 30 seconds.
    `/livez` fails after continuous unhealth reaches `CAPTURELAKE_UNHEALTHY_RESTART_MS`
    (default 1200000, 20 minutes), allowing Kubernetes recovery. A healthy connection's
-   embedding outage does not trip this gate. `PGCONNECT_TIMEOUT=60` bounds PostgreSQL
+   embedding outage does not trip this gate. A lake that rejects every write without
+   invalidating the connection (a rejected catalog password, an internal error) can:
+   work held with no successful commit for `CAPTURELAKE_INGEST_STALL_MS` (default 600000,
+   10 minutes) is logged as an `ingest stalled` error (one bad message on an idle
+   queue does not), and `/livez` fails once that stall reaches the same restart deadline. A stall
+   in queued work restarts the writer without taking it out of the Service (so the reads the lake can still answer
+   keep working), because readiness gains nothing for queue intake and would cut reads; a stall in HTTP `/captures` work also makes
+   `/healthz` return 503. `PGCONNECT_TIMEOUT=60` bounds PostgreSQL
    connection establishment per host unless the DSN overrides it, **not** all native
    SQL/object-store operations. Do not mistake restart/backoff for repaired dependencies.
 6. After repair, verify committed data and acknowledgement, falling source age/backlog,

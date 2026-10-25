@@ -836,7 +836,16 @@ Deployments. This self-heals only while all of these stay true:
 
 **Audit a rotation by CronJob/job exit code, not pod readiness** — the
 CaptureLake writer's `/healthz` never touches the catalog, so a stale-DSN pod
-stays Ready while silently dropping writes:
+stays Ready while writes are not landing (with queued intake until the restart; in HTTP `/captures` mode until the stall is declared): once work has been held
+for `CAPTURELAKE_INGEST_STALL_MS` (default 10 minutes) with no successful commit,
+the writer logs an `ingest stalled` error (one message the lake keeps rejecting does not), and
+once the stall is `CAPTURELAKE_UNHEALTHY_RESTART_MS` old (default 20 minutes, counted from the stall's
+start, so about 11 minutes after that log line: the restart deadline plus three failed liveness
+probes, 30 s apart) the liveness probe restarts it. With queued intake it stays
+Ready until that restart, so the reads the lake can still answer keep working, and does not drop out of
+the Service because readiness gains nothing for queued work; a stall in HTTP `/captures` work does
+return 503 on `/healthz`. A writer with no traffic holds nothing and stays Ready, so keep the
+exit-code audit for idle periods:
 
 ```bash
 kubectl -n arbium get jobs | grep capturelake
