@@ -30,6 +30,9 @@ resource "google_sql_database_instance" "this" {
 
     user_labels = var.labels
 
+    deletion_protection_enabled = var.instance_deletion_protection_enabled
+    retain_backups_on_delete    = var.retain_backups_on_delete
+
     ip_configuration {
       ipv4_enabled                                  = false
       private_network                               = var.network_id

@@ -61,6 +61,18 @@ variable "deletion_protection" {
   default = true
 }
 
+variable "instance_deletion_protection_enabled" {
+  description = "Cloud SQL's own deletion protection (settings.deletion_protection_enabled): the API refuses to delete the instance until it is switched off. Independent of deletion_protection above, which is Terraform's guard checked against state."
+  type        = bool
+  default     = false
+}
+
+variable "retain_backups_on_delete" {
+  description = "Keep the automated backups after the instance is deleted (settings.retain_backups_on_delete)."
+  type        = bool
+  default     = false
+}
+
 variable "create_admin_user" {
   description = "Create a Terraform-managed admin SQL user and generated password secret version. Disable for hosted environments where operators manage DB credentials outside Terraform state."
   type        = bool
