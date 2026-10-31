@@ -886,6 +886,73 @@ Before upgrading across several minor versions, diff
 `helm get values arbium -n arbium -o yaml` against your committed values to
 confirm there are no live-only keys.
 
+## Check the release
+
+An optional end-to-end check that runs inside the cluster as a Helm test: it signs in as a dedicated test person,
+sends a few test items through the same paths your users' devices and tools use, and reads them back. Run it once
+after the install and around each upgrade: once before (the baseline), then upgrade, then once after.
+
+**What it needs first**
+
+- The API service is enabled (`rootsApi.enabled: true`; the chart default is off).
+- A test person, with a device token and a connector token, stored in the Kubernetes Secret named by
+  `capturelake.canary.tokensSecret` (`capturelake-canary` by default) under the keys `PROBE_DEVICE_TOKEN` and
+  `PROBE_MCP_TOKEN`. On ESO, materialize it with `externalSecrets.extraSecrets`. The chart does not create the Secret,
+  and the steps to create the test person and its tokens are not part of this guide yet; do not turn the check on
+  until they exist.
+- The check reuses the test person's settings: `capturelake.canary.rootsUrl` has no default and must be set.
+  Use the in-cluster Service addresses until DNS is cut over.
+
+```yaml
+releaseSmoke:
+  helmTest:
+    enabled: true
+capturelake:
+  canary:
+    rootsUrl: http://roots-api.arbium.svc.cluster.local:3000
+    edgeUrl: http://chaindb-edge-fns.arbium.svc.cluster.local:8000   # defaults to global.publicBaseUrl
+```
+
+Then apply the values with a normal `helm upgrade`. The check needs no Argo Workflows.
+
+**Run it.** Helm waits 300 seconds by default, which is less than the check's own bound
+(`releaseSmoke.activeDeadlineSeconds`, 600 by default), so always pass `--timeout` with that value plus 60 seconds.
+The install's notes print the exact line:
+
+```bash
+helm test arbium -n arbium --logs --timeout 660s
+```
+
+It passes with exit code 0 and `Phase: Succeeded`; `--logs` prints one JSON line with the three checks (`auth`,
+`mcp`, `canary`) and what was sent and read back. It sends `releaseSmoke.count` (3) real test items for the test
+person each run: safe to repeat, not to loop.
+
+**Reading a failure.** The pod's exit code is the check's:
+
+```bash
+kubectl -n arbium get pod chaindb-release-smoke-test \
+  -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}'
+```
+
+| Exit | Meaning | What to do |
+|---|---|---|
+| 6, 7 | sign-in surface or connector answered wrongly | the release is broken: run it once more, and after two failures in a row `helm rollback` |
+| 3, 4, 5 | a test item was refused, did not arrive in time, or could not be read back | same as 6 and 7 |
+| 2 | the check could not judge (bad settings, or a proof it cannot make on this install) | not a broken release: fix the settings |
+| 8 | the connector token is expired or has under a day left | not a broken release: rotate the test person's token |
+| 1 | the check itself crashed | read `kubectl logs chaindb-release-smoke-test` |
+
+A pod reason of `DeadlineExceeded` means the bound cut it off; `CreateContainerConfigError` means the
+Secret is missing: the pod cannot start, so `helm test` waits until the pod's own bound
+(`releaseSmoke.activeDeadlineSeconds`, 600 seconds by default) before it fails.
+
+**What it does not do.** It runs once, with no retry and no automatic rollback: you decide. Every non-zero exit fails
+`helm test`, including 2 and 8. The finished pod stays so you can read its log; the next `helm test` replaces it, and
+`helm uninstall` does not delete it (deleting the namespace does). `helm test` runs the tests of the revision that is
+deployed, so a test before an upgrade runs the old chart's version, and the first release that ships it has no
+baseline. Leave it off where the chart is rendered and applied by a tool (`helm template | kubectl apply`, some GitOps
+tools): it would run the pod on every apply.
+
 ## Destroy disposable environments
 
 ```bash
