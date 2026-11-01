@@ -477,6 +477,27 @@ helm upgrade arbium oci://ghcr.io/try-caret/charts/chaindb \
 Migrations run automatically on the next edge-fns pod rollout (via
 initContainer). Chart versions are the `chaindb-v*` release tags.
 
+### Check the release before and after the upgrade
+
+When the release check is set up (the deployment guide's "Run the release check" section,
+<https://docs.arbium.ai/cloud-ops/4-verify/#run-the-release-check>, which also shows how to create the check account),
+wrap the upgrade with it:
+
+1. Run the check before the upgrade (`helm test arbium -n arbium --logs --timeout 660s` when it runs as a Helm test).
+   It must pass. If it fails, do not upgrade: a failing starting point hides what the upgrade changes. Fix the cause first.
+2. Note the revision that is deployed now, from `helm history arbium -n arbium`.
+3. Run the upgrade as above.
+4. Run the check again. If it fails, run it once more. If it fails twice in a row with exit 3, 4, 5, 6 or 7 (exit 2 and 8 are not a broken release: fix the settings, or renew the connector token), roll back to the revision you noted
+   and run the check a third time to confirm that the previous release serves again:
+
+   ```bash
+   helm rollback arbium <revision> -n arbium --wait --timeout 20m
+   ```
+
+A rollback puts back the previous chart's workloads and settings. It does not reverse changes the new release made to
+the database. The first upgrade that turns the check on has no "before" run, because the check arrives with that
+upgrade. If the connector token has under 14 days left, renew it first.
+
 ---
 
 ## Destroy disposable environments

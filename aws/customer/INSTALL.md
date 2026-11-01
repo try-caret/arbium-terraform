@@ -876,6 +876,27 @@ Before upgrading across several minor versions, diff
 `helm get values arbium -n arbium -o yaml` against your committed values to
 confirm there are no live-only keys.
 
+### Check the release before and after the upgrade
+
+When the release check is set up (the "Check the release" section below), wrap the upgrade with it:
+
+1. Run the check before the upgrade (`helm test arbium -n arbium --logs --timeout 660s`). It must pass. If it fails,
+   do not upgrade: a failing starting point hides what the upgrade changes. Fix the cause first.
+2. Note the revision that is deployed now, from `helm history arbium -n arbium`.
+3. Run the upgrade as above.
+4. Run the check again. If it fails, run it once more. If it fails twice in a row with exit 3, 4, 5, 6 or 7 (exit 2 and 8 are not a broken release: fix the settings, or renew the connector token), roll back to the revision you noted
+   and run the check a third time to confirm that the previous release serves again:
+
+   ```bash
+   helm rollback arbium <revision> -n arbium --wait --timeout 20m
+   ```
+
+`helm test` runs the test of the revision that is deployed, so the run before the upgrade uses the old chart's check.
+A rollback puts back the previous chart's workloads and settings. It does not reverse changes the new release made to
+the database. The first upgrade that turns the check on has no "before" run, because the check arrives with that
+upgrade. If the connector token has under 14 days left, renew it first. The full page, with the Argo Workflow variant,
+is <https://docs.arbium.ai/cloud-ops/4-verify/#run-the-release-check>.
+
 ## Check the release
 
 An optional end-to-end check that runs inside the cluster as a Helm test: it signs in as a dedicated test person,
@@ -887,9 +908,10 @@ after the install and around each upgrade: once before (the baseline), then upgr
 - The API service is enabled (`rootsApi.enabled: true`; the chart default is off).
 - A test person, with a device token and a connector token, stored in the Kubernetes Secret named by
   `capturelake.canary.tokensSecret` (`capturelake-canary` by default) under the keys `PROBE_DEVICE_TOKEN` and
-  `PROBE_MCP_TOKEN`. On ESO, materialize it with `externalSecrets.extraSecrets`. The chart does not create the Secret,
-  and the steps to create the test person and its tokens are not part of this guide yet; do not turn the check on
-  until they exist.
+  `PROBE_MCP_TOKEN`. The chart does not create the Secret. One command creates the test person and the Secret, and a
+  second renews the connector token before it expires (90 days by default); both are in the deployment guide's
+  "Create the check account" section, <https://docs.arbium.ai/cloud-ops/4-verify/#create-the-check-account>. On ESO,
+  that section also shows how to move the two values into your secret store for `externalSecrets.extraSecrets`.
 - The check reuses the test person's settings: `capturelake.canary.rootsUrl` has no default and must be set.
   Use the in-cluster Service addresses until DNS is cut over.
 
