@@ -396,16 +396,6 @@ kubectl -n arbium create secret generic admin-ui-oidc \
 Add the redirect URI `https://<ingress.host>/admin/api/auth/callback` to the
 Entra admin app.
 
-Optional (marketplace/skill publishing only): register the marketplace GitHub
-App by hand — its private key is downloadable exactly once, so load it
-straight into the cluster rather than round-tripping through any store:
-
-```bash
-kubectl -n arbium create secret generic arbium-github-app \
-  --from-file=GITHUB_APP_PRIVATE_KEY=./app.private-key.pem \
-  --from-literal=GITHUB_WEBHOOK_SECRET=<webhook-secret>
-```
-
 ### 5c. Populate Secrets Manager — only what ESO actually reads
 
 Terraform created empty containers named `<prefix>/<environment>/<name>`.
