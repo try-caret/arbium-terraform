@@ -198,7 +198,7 @@ resource "aws_eks_node_group" "gpu" {
 #
 # Tainted, not merely labelled: an unrelated pod scheduled here would put the ceiling back, which is
 # the whole problem this removes. The chart's capturelake nodeSelector + tolerations are what opt
-# the writer (and its maintenance CronJobs) in.
+# the writer (and its Argo workflow pods for maintenance) in.
 resource "aws_eks_node_group" "lake" {
   count = var.lake_node_desired_size > 0 ? 1 : 0
 

@@ -157,11 +157,11 @@ Arbium client / operator smoke test
        -> embedder service on GKE GPU node pool
        -> chaindb-capturelake service   (the capture store — required)
 
-Kubernetes CronJobs
-  -> chaindb-capturelake-derive        -> LLM provider (episode synthesis)
-  -> chaindb-capturelake-flush         -> every 5 min: inlined rows -> Parquet
-  -> chaindb-capturelake-compact       -> every 30 min: flush + merge files
-  -> chaindb-capturelake-maintenance   -> daily: compact + snapshot expiry + file deletion
+Argo CronWorkflows (each run is a Workflow)
+  -> chaindb-capturelake-derive           -> LLM provider (episode synthesis)
+  -> chaindb-capturelake-flush            -> every 5 min: inlined rows -> Parquet
+  -> chaindb-capturelake-compact          -> every 30 min: flush + merge files
+  -> chaindb-capturelake-maintenance-full -> daily: compact + snapshot expiry + file deletion
   -> chaindb-capturelake-search-reconcile
 ```
 

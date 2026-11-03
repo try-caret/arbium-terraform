@@ -756,11 +756,9 @@ is yours), and check CaptureLake:
 
 ```bash
 kubectl -n arbium logs deploy/chaindb-capturelake --tail=20
-kubectl -n arbium get jobs | grep capturelake   # audit rotation by job exit code, not pod Ready
+kubectl -n arbium get workflows | grep capturelake   # audit rotation by Workflow phase, not pod Ready
+kubectl -n arbium get cronworkflow -o 'custom-columns=NAME:.metadata.name,LAST:.status.lastScheduledTime,SUSPENDED:.spec.suspend'   # last scheduled time
 ```
-
-Jobs moved to the Argo engine (`capturelake.pipeline.engine.<job>: argo`) run as Workflows: check
-`kubectl -n arbium get workflows` (and `get cronworkflow`) for those instead.
 
 ### Provision identities via the SCIM API (no Entra changes)
 
@@ -824,7 +822,7 @@ Deployments. This self-heals only while all of these stay true:
    passwords and do NOT track the master rotation** (that's the point of
    them); rotate those out-of-band if ever needed.
 
-**Audit a rotation by CronJob/job exit code, not pod readiness** — the
+**Audit a rotation by scheduled-run result, not pod readiness**: the
 CaptureLake writer's `/healthz` never touches the catalog, so a stale-DSN pod
 stays Ready while writes are not landing (with queued intake until the restart; in HTTP `/captures` mode until the stall is declared): once work has been held
 for `CAPTURELAKE_INGEST_STALL_MS` (default 10 minutes) with no successful commit,
@@ -835,14 +833,12 @@ probes, 30 s apart) the liveness probe restarts it. With queued intake it stays
 Ready until that restart, so the reads the lake can still answer keep working, and does not drop out of
 the Service because readiness gains nothing for queued work; a stall in HTTP `/captures` work does
 return 503 on `/healthz`. A writer with no traffic holds nothing and stays Ready, so keep the
-exit-code audit for idle periods:
+scheduled-run audit (the CaptureLake jobs run as Argo Workflows, one CronWorkflow per job; check the recent Workflows) for idle periods:
 
 ```bash
-kubectl -n arbium get jobs | grep capturelake
+kubectl -n arbium get cronworkflow
+kubectl -n arbium get workflows | grep capturelake
 ```
-
-Jobs moved to the Argo engine (`capturelake.pipeline.engine.<job>: argo`) run as Workflows: check
-`kubectl -n arbium get workflows` (and `get cronworkflow`) for those instead.
 
 Post-roll assertion:
 
@@ -858,7 +854,7 @@ helm roll covers it).
 
 ## Upgrading the chart
 
-Same as install — preflight first, full values, pinned version:
+Same as install — preflight first, full values, pinned version. Upgrading a release that still runs the CronJob engine (any release older than the one that removed it) needs the CRD apply, the values cleanup and the namespace check first: see charts/chaindb/INSTALL.md, "Upgrading from the CronJob engine".
 
 ```bash
 # First pull/extract the NEW pinned version and update CHART_DIR.

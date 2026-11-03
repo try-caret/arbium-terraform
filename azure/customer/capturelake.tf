@@ -1,7 +1,7 @@
 # CaptureLake — Azure Blob data store for the `chaindb-capturelake` workload
 #
 # CaptureLake (the chart's capturelake Deployment + ten-minute maintenance/
-# derive CronJobs) stores its DuckLake Parquet in a Blob container. DuckDB's
+# derive Argo CronWorkflows) stores its DuckLake Parquet in a Blob container. DuckDB's
 # `azure` extension authenticates with the storage-account connection string,
 # delivered Key Vault -> ESO -> runtime Secret like every other runtime
 # credential here (the Azure analogue of the GCS HMAC key pair on GCP; AWS uses

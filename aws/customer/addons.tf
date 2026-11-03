@@ -360,7 +360,7 @@ resource "aws_s3_bucket_policy" "alb_access_logs" {
 # ─────────────────────────────────────────────────────────────────────────────
 # CaptureLake — S3 data bucket + IRSA for the `chaindb-capturelake` KSA
 #
-# CaptureLake (the chart's capturelake Deployment + derive CronJob) stores its
+# CaptureLake (the chart's capturelake Deployment + derive Argo workflow pods) stores its
 # DuckLake Parquet on S3. The pod reaches S3 via IRSA (DuckDB's credential_chain
 # provider — no static keys), so this role is the only S3 credential. The
 # DuckLake catalog + derived store reuse the existing Aurora (separate databases,
@@ -457,7 +457,7 @@ data "aws_iam_policy_document" "capturelake" {
     resources = ["${aws_s3_bucket.capturelake[0].arn}/*"]
   }
 
-  # The maintenance CronJob samples the database's CPU and capacity into its own telemetry, so a
+  # The maintenance workflow pods sample the database's CPU and capacity into its own telemetry, so a
   # ramp that is really a database ceiling reads as one. CloudWatch's read APIs take no resource
   # ARN, so "*" is the only form this grant has; it carries no write and no other namespace.
   statement {
