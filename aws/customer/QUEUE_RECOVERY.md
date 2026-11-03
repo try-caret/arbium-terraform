@@ -94,8 +94,8 @@ volatile and limited; it is not protected by server queue retention.
    passes without supporting success neither count nor reset. Its own other records
    cannot supply evidence. After **five accumulated observations**, the entire message
    stops receiving lease extensions without acknowledgement or immediate release.
-   Natural expiry/redelivery may eventually send it to the DLQ. Shutdown and uncertain
-   renewal retain it. Remove `CAPTURE_QUEUE_SINGLETON_FAILURE_LIMIT` before upgrading:
+   Natural expiry/redelivery may eventually send it to the DLQ. Shutdown hands it back
+   (still not retired) and uncertain renewal retains it. Remove `CAPTURE_QUEUE_SINGLETON_FAILURE_LIMIT` before upgrading:
    startup rejects the old setting; the new observation threshold is fixed at five.
 
    One reserved control slot lets the consumer request one further message when all
