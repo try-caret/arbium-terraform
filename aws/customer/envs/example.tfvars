@@ -52,6 +52,11 @@ gpu_node_max_size       = 1
 # Installs NVIDIA's Kubernetes device plugin on GPU nodes so pods can request nvidia.com/gpu.
 enable_nvidia_device_plugin = true
 
+# Optional: let more than one pod share each GPU (NVIDIA time-slicing). 1 means no sharing. With 2 the
+# embedder can start its new pod beside the old one during an update (also set embedder.gpu.shared: true
+# in the chart values, after this is applied). Pods take turns on the GPU and share its memory.
+# gpu_time_slicing_replicas = 2
+
 # Secret containers only. Populate values out-of-band in AWS Secrets Manager.
 secret_names = ["db", "scheduler", "scim", "sentry", "registry", "gemini", "enrollment", "jwt"]
 

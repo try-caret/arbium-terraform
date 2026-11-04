@@ -279,6 +279,22 @@ variable "nvidia_device_plugin_chart_version" {
   default     = "0.17.1"
 }
 
+variable "gpu_time_slicing_replicas" {
+  type        = number
+  description = "How many pods can share each physical GPU through NVIDIA time-slicing. 1 (the default) is no sharing: each GPU serves one pod. With 2 or more the GPU node advertises that many nvidia.com/gpu per card, which lets the embedder start a new pod beside the old one during a release (set embedder.gpu.shared in the chart values after this is applied). The slices across your GPU nodes must cover the embedder replicas plus one (embedder.replicaCount + 1). To remove sharing, set embedder.gpu.shared to false and release first, then lower this. Time-slicing does not divide GPU memory: the pods share the card's memory and take turns on it, so size the model for the number of copies that run at once. Needs enable_nvidia_device_plugin."
+  default     = 1
+
+  validation {
+    condition     = var.gpu_time_slicing_replicas == floor(var.gpu_time_slicing_replicas) && var.gpu_time_slicing_replicas >= 1 && var.gpu_time_slicing_replicas <= 16
+    error_message = "gpu_time_slicing_replicas must be a whole number from 1 (no sharing) to 16."
+  }
+
+  validation {
+    condition     = var.gpu_time_slicing_replicas == 1 || var.enable_nvidia_device_plugin
+    error_message = "gpu_time_slicing_replicas above 1 is configured on the NVIDIA device plugin; set enable_nvidia_device_plugin = true or leave gpu_time_slicing_replicas at 1."
+  }
+}
+
 variable "secret_names" {
   description = "Secrets Manager secret containers to create. Values are intentionally not managed by Terraform."
   type        = set(string)

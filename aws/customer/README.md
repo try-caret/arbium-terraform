@@ -24,6 +24,7 @@ Regardless of network mode:
 - Aurora PostgreSQL Serverless v2.
 - Secrets Manager secret containers only; secret values are populated out-of-band.
 - RDS-managed master user secret for Aurora credentials.
+- Optional GPU sharing (`gpu_time_slicing_replicas`, default 1 = off): with 2 or more, the NVIDIA device plugin lets that many pods share each GPU by taking turns on it, so the embedder can start its new pod beside the old one during an update. GPU memory is not divided between the pods. The slices across your GPU nodes must cover the embedder replicas plus one. Apply it before setting the chart value `embedder.gpu.shared: true`; with too few slices the new pod would wait for a GPU and the update would stall. To remove sharing, set `embedder.gpu.shared: false` and release first, then lower this.
 - Optional ACM certificate request for the Arbium HTTPS ingress, with DNS validation records output for the customer's DNS provider.
 
 ## Usage

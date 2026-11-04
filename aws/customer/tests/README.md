@@ -28,6 +28,10 @@ for supplied networking, invalid subnet shapes/membership/AZs/DNS, private-only
 internal ingress, opt-in DNS defaults, undelegated certificate foundation,
 canonicalized ACM domain names, and post-Helm ALB alias wiring.
 
+`tests/gpu-time-slicing.tftest.hcl` (same isolated-copy recipe, `-filter=tests/gpu-time-slicing.tftest.hcl`)
+covers the opt-in GPU sharing: off by default with the device plugin's values unchanged, the time-slicing
+config for 2 replicas, and rejection of 0, more than 16, or sharing without the device plugin.
+
 The internal checkout additionally has:
 
 ```bash

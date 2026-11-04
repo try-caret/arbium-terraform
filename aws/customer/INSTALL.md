@@ -295,6 +295,12 @@ kubectl get nodes
 Expected: general nodes + (if GPU desired ≥ 1) a GPU node with the
 `nvidia.com/gpu` resource and `workload=embedder:NoSchedule` taint.
 
+If you set `gpu_time_slicing_replicas` to 2 or more, the GPU node shows that many `nvidia.com/gpu` per card.
+Check `kubectl describe node <gpu-node>` before setting `embedder.gpu.shared: true` in the chart values
+(section 5 sets the chart values), or the embedder's update waits for a GPU that is not there. The slices
+across your GPU nodes must cover the embedder replicas plus one. To remove sharing later, set
+`embedder.gpu.shared: false` and release first, then lower `gpu_time_slicing_replicas`.
+
 Confirm controllers:
 
 ```bash

@@ -709,6 +709,14 @@ resource "aws_iam_role_policy_attachment" "admin_ui" {
 # ─────────────────────────────────────────────────────────────────────────────
 # NVIDIA Device Plugin
 # Required so embedder pods on g5/g6 nodes can request nvidia.com/gpu.
+#
+# gpu_time_slicing_replicas > 1 adds the plugin's time-slicing config (chart 0.17.1:
+# config.map.<name> is a plugin config file, `default` is picked up with no other setting;
+# sharing.timeSlicing.resources is the file's key, see the chart's README "Shared Access to GPUs").
+# The node then advertises that many nvidia.com/gpu per card and the scheduler can place a surge
+# pod beside the running one. Time-slicing has no memory isolation. renameByDefault=false keeps the
+# resource name, so pod specs do not change; failRequestsGreaterThanOne=true makes a pod that asks
+# for more than one slice fail loudly instead of getting a share that is not a bigger share.
 # ─────────────────────────────────────────────────────────────────────────────
 
 resource "helm_release" "nvidia_device_plugin" {
@@ -720,7 +728,7 @@ resource "helm_release" "nvidia_device_plugin" {
   chart      = "nvidia-device-plugin"
   version    = var.nvidia_device_plugin_chart_version
 
-  values = [
+  values = compact([
     yamlencode({
       nodeSelector = {
         workload = "embedder"
@@ -733,8 +741,31 @@ resource "helm_release" "nvidia_device_plugin" {
           effect   = "NoSchedule"
         }
       ]
-    })
-  ]
+    }),
+    # A second values document, only when sharing is on: with it off the release is byte-identical
+    # to what it was, so adopting this variable plans no change to existing installs.
+    var.gpu_time_slicing_replicas > 1 ? yamlencode({
+      config = {
+        map = {
+          default = yamlencode({
+            version = "v1"
+            sharing = {
+              timeSlicing = {
+                renameByDefault            = false
+                failRequestsGreaterThanOne = true
+                resources = [
+                  {
+                    name     = "nvidia.com/gpu"
+                    replicas = var.gpu_time_slicing_replicas
+                  }
+                ]
+              }
+            }
+          })
+        }
+      }
+    }) : ""
+  ])
 
   depends_on = [module.eks]
 }
