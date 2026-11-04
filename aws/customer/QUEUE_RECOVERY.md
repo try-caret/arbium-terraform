@@ -28,7 +28,7 @@ support; older install-guide example pins do not imply support for these setting
    `/invocations`) and any required invocation/authentication permissions. For a
    SageMaker deployment, use `SAGEMAKER_EMBEDDER_ENDPOINT` instead and grant scoped
    `sagemaker:InvokeEndpoint` permission; keep edge embedding access for rollback.
-3. Deploy the single writer with deduplication and `Recreate`. Enable
+3. Deploy the single writer with deduplication (it rolls with a standby pod and a writer lease). Enable
    `CAPTURE_QUEUE_CONSUMER_ENABLED=true` on it, then verify receive, embedding,
    persistence and acknowledgement with approved test data before enabling
    `CAPTURE_INGEST_QUEUED=true` on edge. Confirm native dead-letter routing and alerts.
