@@ -818,8 +818,10 @@ ESO syncs it into `chaindb-runtime` and Reloader rolls the annotated
 Deployments. This self-heals only while all of these stay true:
 
 1. Reloader installed by Terraform (`helm_release.reloader`), running in `reloader`.
-2. `reloader.enabled: true` in the values file (admin-ui/llm-proxy opt into
-   extra Secrets via `admin.envFromSecrets` etc.).
+2. `reloader.enabled: true` in the values file (the chart then annotates every
+   workload that uses a Secret with `secret.reloader.stakater.com/auto`, so Reloader
+   reads the Secrets from each pod spec and no list needs keeping). The chart's own
+   `reloader-controller` stays off here: Terraform's Reloader is the one running.
 3. `externalSecrets.db.fromManagedSecret` set (else DATABASE_URL tracks a
    static password that never rotates).
 4. Every DSN that must track the rotation goes through `fromManagedSecret` —
@@ -850,7 +852,7 @@ Post-roll assertion:
 
 ```bash
 kubectl -n arbium get deploy admin-ui chaindb-edge-fns scim \
-  -o 'jsonpath={range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.secret\.reloader\.stakater\.com/reload}{"\n"}{end}'
+  -o 'jsonpath={range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.secret\.reloader\.stakater\.com/auto}{"\n"}{end}'
 kubectl -n arbium get configmap chaindb-config -o jsonpath='{.data.AUTH_PROVISIONING_MODE}'   # scim on SCIM-gated clusters
 ```
 
