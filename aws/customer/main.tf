@@ -177,19 +177,21 @@ module "secrets" {
 module "aurora" {
   source = "./modules/aurora"
 
-  name_prefix                = var.name_prefix
-  environment                = var.environment
-  vpc_id                     = local.network.vpc_id
-  subnet_ids                 = local.network.private_subnet_ids
-  eks_node_security_group_id = module.eks.node_security_group_id
-  database_name              = var.database_name
-  engine_version             = var.aurora_engine_version
-  serverless_min_acu         = var.aurora_serverless_min_acu
-  serverless_max_acu         = var.aurora_serverless_max_acu
-  instance_count             = var.aurora_instance_count
-  backup_retention_days      = var.aurora_backup_retention_days
-  deletion_protection        = var.aurora_deletion_protection
-  skip_final_snapshot        = var.aurora_skip_final_snapshot
-  enable_http_endpoint       = var.aurora_enable_http_endpoint
-  tags                       = local.tags
+  name_prefix                           = var.name_prefix
+  environment                           = var.environment
+  vpc_id                                = local.network.vpc_id
+  subnet_ids                            = local.network.private_subnet_ids
+  eks_node_security_group_id            = module.eks.node_security_group_id
+  database_name                         = var.database_name
+  engine_version                        = var.aurora_engine_version
+  serverless_min_acu                    = var.aurora_serverless_min_acu
+  serverless_max_acu                    = var.aurora_serverless_max_acu
+  instance_count                        = var.aurora_instance_count
+  backup_retention_days                 = var.aurora_backup_retention_days
+  deletion_protection                   = var.aurora_deletion_protection
+  skip_final_snapshot                   = var.aurora_skip_final_snapshot
+  enable_http_endpoint                  = var.aurora_enable_http_endpoint
+  performance_insights_enabled          = var.aurora_performance_insights_enabled
+  performance_insights_retention_period = var.aurora_performance_insights_retention_period
+  tags                                  = local.tags
 }

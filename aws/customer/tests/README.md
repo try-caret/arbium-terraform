@@ -32,6 +32,12 @@ canonicalized ACM domain names, and post-Helm ALB alias wiring.
 covers the opt-in GPU sharing: off by default with the device plugin's values unchanged, the time-slicing
 config for 2 replicas, and rejection of 0, more than 16, or sharing without the device plugin.
 
+`tests/aurora-performance-insights.tftest.hcl` (same isolated-copy recipe, `-filter=tests/aurora-performance-insights.tftest.hcl`)
+covers the Aurora module's Performance Insights: on with 7 days by default, no retention sent when off, a longer retention
+passed through, and rejection of retention values AWS does not accept (accepts 7, 731 and multiples of 31 up to 713).
+`tests/aurora-performance-insights-root.tftest.hcl` (`-filter=tests/aurora-performance-insights-root.tftest.hcl`) plans
+the root and checks the two `aurora_performance_insights_*` variables reach the module.
+
 The internal checkout additionally has:
 
 ```bash

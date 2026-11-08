@@ -21,3 +21,11 @@ output "master_user_secret_arn" {
 output "security_group_id" {
   value = aws_security_group.aurora.id
 }
+
+output "performance_insights_enabled" {
+  value = length(aws_rds_cluster_instance.this) > 0 ? aws_rds_cluster_instance.this[0].performance_insights_enabled : false
+}
+
+output "performance_insights_retention_period" {
+  value = length(aws_rds_cluster_instance.this) > 0 ? aws_rds_cluster_instance.this[0].performance_insights_retention_period : null
+}

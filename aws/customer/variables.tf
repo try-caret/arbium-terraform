@@ -370,6 +370,18 @@ variable "aurora_enable_http_endpoint" {
   default     = false
 }
 
+variable "aurora_performance_insights_enabled" {
+  description = "Turn on RDS Performance Insights for the Aurora database, so a database stall leaves wait-event data to look at. Seven days of retention are free."
+  type        = bool
+  default     = true
+}
+
+variable "aurora_performance_insights_retention_period" {
+  description = "Days Performance Insights keeps its data: 7 (free), 731, or a multiple of 31 from 31 to 713 (the last two are paid). Ignored when aurora_performance_insights_enabled is false."
+  type        = number
+  default     = 7
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Cluster addons (LBC + ESO) — see addons.tf
 # ─────────────────────────────────────────────────────────────────────────────

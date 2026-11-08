@@ -91,6 +91,11 @@ resource "aws_rds_cluster_instance" "this" {
   publicly_accessible  = false
   apply_immediately    = var.apply_immediately
 
+  # No performance_insights_kms_key_id: new instances get the AWS-managed key, and an instance that
+  # already has Performance Insights on keeps its own key (the attribute is optional and computed).
+  performance_insights_enabled          = var.performance_insights_enabled
+  performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_period : null
+
   tags = merge(var.tags, {
     Name = "${local.name}-chaindb-${count.index + 1}"
   })

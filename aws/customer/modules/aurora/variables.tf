@@ -60,6 +60,23 @@ variable "enable_http_endpoint" {
   default     = false
 }
 
+variable "performance_insights_enabled" {
+  description = "Turn on RDS Performance Insights for the Aurora instances, so a database stall leaves wait-event data to look at. Seven days of retention are free."
+  type        = bool
+  default     = true
+}
+
+variable "performance_insights_retention_period" {
+  description = "Days Performance Insights keeps its data: 7 (free), 731, or a multiple of 31 from 31 to 713 (the last two are paid). Ignored when Performance Insights is off."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = contains([7, 731], var.performance_insights_retention_period) || (var.performance_insights_retention_period % 31 == 0 && var.performance_insights_retention_period >= 31 && var.performance_insights_retention_period <= 713)
+    error_message = "performance_insights_retention_period must be 7, 731, or a multiple of 31 from 31 to 713."
+  }
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
