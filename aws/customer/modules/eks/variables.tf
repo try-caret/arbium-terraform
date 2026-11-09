@@ -29,3 +29,8 @@ variable "enable_node_launch_template" {
   type        = bool
   default     = false
 }
+
+variable "enable_network_policy" {
+  type    = bool
+  default = false
+}

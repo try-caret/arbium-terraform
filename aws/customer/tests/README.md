@@ -27,6 +27,9 @@ Coverage: default three-AZ created-network/output contracts, whole-module bypass
 for supplied networking, invalid subnet shapes/membership/AZs/DNS, private-only
 internal ingress, opt-in DNS defaults, undelegated certificate foundation,
 canonicalized ACM domain names, and post-Helm ALB alias wiring.
+`agent-platform.tftest.hcl` covers the agent platform's role, its sandboxes' network policy, quota,
+limits and pod template; `eks-cni.tftest.hcl` plans `modules/eks` alone for the VPC CNI settings
+with network policy enforcement off and on.
 
 `tests/gpu-time-slicing.tftest.hcl` (same isolated-copy recipe, `-filter=tests/gpu-time-slicing.tftest.hcl`)
 covers the opt-in GPU sharing: off by default with the device plugin's values unchanged, the time-slicing

@@ -267,13 +267,16 @@ resource "aws_eks_addon" "this" {
   # creates for pods at runtime via the node role (Terraform's default_tags
   # can't reach them), satisfying tag-enforcement SCPs that gate
   # ec2:CreateNetworkInterface.
-  configuration_values = each.value == "vpc-cni" ? jsonencode({
-    env = {
-      WARM_IP_TARGET      = "2"
-      MINIMUM_IP_TARGET   = "8"
-      ADDITIONAL_ENI_TAGS = jsonencode(var.tags)
-    }
-  }) : null
+  configuration_values = each.value == "vpc-cni" ? jsonencode(merge(
+    {
+      env = {
+        WARM_IP_TARGET      = "2"
+        MINIMUM_IP_TARGET   = "8"
+        ADDITIONAL_ENI_TAGS = jsonencode(var.tags)
+      }
+    },
+    var.enable_network_policy ? { enableNetworkPolicy = "true" } : {},
+  )) : null
 
   tags = var.tags
 

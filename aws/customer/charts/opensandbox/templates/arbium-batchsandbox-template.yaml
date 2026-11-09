@@ -1,0 +1,13 @@
+{{- /* Arbium addition to the vendored chart: the BatchSandbox pod template the server merges into
+every sandbox, mounted over [kubernetes].batchsandbox_template_file. Replaces the image's example,
+whose blanket toleration let sandboxes land on any tainted node. */ -}}
+{{- with .Values.batchsandboxTemplate }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensandbox-batchsandbox-template
+  namespace: {{ $.Release.Namespace }}
+data:
+  template.yaml: |
+{{ toYaml . | indent 4 }}
+{{- end }}
