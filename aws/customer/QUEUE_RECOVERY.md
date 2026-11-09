@@ -84,9 +84,11 @@ volatile and limited; it is not protected by server queue retention.
    stale renewal result cannot block their release/acknowledgement. Successful writes are
    acknowledged only after all rows in that message have committed; uncertain writes retry
    through deduplication.
-3. Size-sensitive embedding/commit failures halve the operation down to one record and
+3. Size-sensitive commit failures halve the operation down to one record and
    reuse completed vectors and confirmed writes. Four full successful batches double
-   that operation's cap toward its configured ceiling. Failed batches defer their
+   that operation's cap toward its configured ceiling. An embedding failure bisects per
+   capture instead: the shared embed cap halves only when a second, unrelated message's
+   slice fails with no embed success between (an embedder outage). Failed batches defer their
    messages for the rest of the processing pass; other already-held messages continue.
    Confirmed writes reset backoff. A unit failure earns one observation only when a
    **different message succeeds at the same operation in the same processing pass**
