@@ -35,3 +35,7 @@ output "cluster_ca_certificate" {
   description = "Base64-encoded cluster CA cert. Consumed by helm + kubernetes terraform providers."
   value       = aws_eks_cluster.this.certificate_authority[0].data
 }
+
+output "auto_node_role_name" {
+  value = one(aws_iam_role.auto_nodes[*].name)
+}

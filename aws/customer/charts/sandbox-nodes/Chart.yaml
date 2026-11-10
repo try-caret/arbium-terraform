@@ -1,0 +1,4 @@
+apiVersion: v2
+name: sandbox-nodes
+description: The cluster objects for the agent platform's function sandbox nodes, rendered whole by Terraform (agent-platform.tf).
+version: 0.1.0

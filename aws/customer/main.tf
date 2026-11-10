@@ -126,7 +126,7 @@ module "eks" {
   lake_node_desired_size          = var.lake_node_desired_size
   lake_node_max_size              = var.lake_node_max_size
   enable_node_launch_template     = var.enable_node_launch_template
-  enable_network_policy           = local.opensandbox == 1
+  enable_auto_mode                = local.aws_sandbox == 1
   tags                            = local.tags
 }
 

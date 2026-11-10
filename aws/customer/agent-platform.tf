@@ -1,5 +1,5 @@
 # The agent platform's AWS side (the chart's agentPlatform component): the IAM role its pods run as,
-# the certificate for its own HTTPS name, and its function sandbox (OpenSandbox in the cluster, or AWS). Opt-in; turning the
+# the certificate for its own HTTPS name, and its function sandbox (Nitro sandbox pods in the cluster). Opt-in; turning the
 # component on is a separate Helm change that takes the agent_platform output.
 variable "enable_agent_platform" {
   type        = bool
@@ -14,7 +14,7 @@ variable "enable_agent_platform" {
 variable "agent_platform_domain_name" {
   type        = string
   default     = ""
-  description = "The platform's HTTPS name (agentPlatform.host), e.g. agents.example.com. Agent Connect's signed events, action links and function callbacks arrive there. Set it to ingress_domain_name to share the install's name, with no certificate of its own (not with the opensandbox sandbox, which the chart refuses)."
+  description = "The platform's HTTPS name (agentPlatform.host), e.g. agents.example.com. Agent Connect's signed events, action links and function callbacks arrive there. Set it to ingress_domain_name to share the install's name, with no certificate of its own."
 }
 
 variable "agent_platform_bedrock_models" {
@@ -35,28 +35,23 @@ variable "agent_platform_bedrock_role_arn" {
 
 variable "agent_platform_sandbox" {
   type        = string
-  default     = "opensandbox"
-  description = "Where agent functions run, one per deployment (agentPlatform.sandbox.provider): opensandbox installs the OpenSandbox server in the cluster; aws provisions an AgentCore code interpreter in VPC mode with no network egress, run as a role with no permissions (its gate, AWS_SANDBOX_EXPERIMENT, stays the operator's attestation in Helm values)."
+  default     = "none"
+  description = "Where agent functions run (agentPlatform.sandbox.provider): aws runs each call in a pod of its own inside a Nitro sandbox (a VM with its own kernel, runtimeClassName isolated-sandbox) on Auto Mode nodes kept for sandboxes, and needs cluster_version 1.36 or later (it turns on EKS Auto Mode with no built-in node pools); none provisions no sandbox, and functions stay off."
   validation {
-    condition     = contains(["opensandbox", "aws"], var.agent_platform_sandbox)
-    error_message = "agent_platform_sandbox must be opensandbox or aws."
+    condition     = contains(["aws", "none"], var.agent_platform_sandbox)
+    error_message = "agent_platform_sandbox must be aws or none."
+  }
+  validation {
+    condition     = var.agent_platform_sandbox != "aws" || tonumber(split(".", var.cluster_version)[1]) >= 36
+    error_message = "agent_platform_sandbox = \"aws\" needs cluster_version 1.36 or later, for Nitro sandboxes."
   }
 }
 
 locals {
-  agent_platform         = var.enable_agent_platform ? 1 : 0
-  agent_platform_sandbox = var.enable_agent_platform && var.agent_platform_sandbox == "aws" ? 1 : 0
-  opensandbox            = var.enable_agent_platform && var.agent_platform_sandbox == "opensandbox" ? 1 : 0
-  # Merged by the server into every sandbox pod. Lists replace rather than merge, and the server
-  # sets containers and volumes itself, so only pod-level fields belong here.
-  opensandbox_template = {
-    spec = {
-      replicas = 1
-      template = {
-        spec = { restartPolicy = "Never", enableServiceLinks = false }
-      }
-    }
-  }
+  agent_platform = var.enable_agent_platform ? 1 : 0
+  aws_sandbox    = var.enable_agent_platform && var.agent_platform_sandbox == "aws" ? 1 : 0
+  # Where function pods run (agentPlatform.sandbox.namespace).
+  sandbox_namespace = "agent-functions"
   # A profile routes to its model in several regions: allow the model there, only through the profiles.
   agent_platform_profile_arns = [
     for id in var.agent_platform_bedrock_models :
@@ -123,199 +118,48 @@ resource "aws_iam_role_policy" "agent_platform" {
         Action    = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
         Resource  = local.agent_platform_model_arns
         Condition = { StringLike = { "bedrock:InferenceProfileArn" = local.agent_platform_profile_arns } }
-      }],
-      local.agent_platform_sandbox == 1 ? [{
-        Sid    = "FunctionSandbox"
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:GetCodeInterpreter",
-          "bedrock-agentcore:StartCodeInterpreterSession",
-          "bedrock-agentcore:InvokeCodeInterpreter",
-          "bedrock-agentcore:StopCodeInterpreterSession",
-        ]
-        Resource = aws_bedrockagentcore_code_interpreter.agent_sandbox[0].code_interpreter_arn
-    }] : [])
+      }]
+    )
   })
 }
 
-# The function sandbox runs as this role, which may do nothing.
-resource "aws_iam_role" "agent_sandbox" {
-  count = local.agent_platform_sandbox
-  name  = "${var.name_prefix}-${var.environment}-agent-sandbox"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "bedrock-agentcore.amazonaws.com" }
-      Condition = { StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id } }
-    }]
-  })
-  tags = local.tags
-}
-
-# The sandbox can read this role's credentials from its metadata service (measured on IDC, 2026-11-09), and DNS
-# lookups leave it, so the credentials could too. An explicit deny keeps them worthless anywhere, even against a
-# resource policy that lets in any principal of the account. AgentCore still assumes the role (its trust).
-resource "aws_iam_role_policy" "agent_sandbox_deny_all" {
-  count = local.agent_platform_sandbox
-  name  = "deny-all"
-  role  = aws_iam_role.agent_sandbox[0].id
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{ Sid = "DenyEverything", Effect = "Deny", Action = "*", Resource = "*" }]
-  })
-}
-
-# No rule at all: nothing in, nothing out. The platform exchanges files and commands with the
-# sandbox through AgentCore's API, never over the network.
-resource "aws_security_group" "agent_sandbox" {
-  count       = local.agent_platform_sandbox
-  name_prefix = "${var.name_prefix}-${var.environment}-agent-sandbox-"
-  description = "Agent function sandbox: no inbound, no outbound"
-  vpc_id      = local.network.vpc_id
-  ingress     = []
-  egress      = []
-  tags        = merge(local.tags, { Name = "${var.name_prefix}-${var.environment}-agent-sandbox" })
-  # The interpreter's network interfaces keep a group for a while after it is gone: a replacement is
-  # created before the old one is released.
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_bedrockagentcore_code_interpreter" "agent_sandbox" {
-  count              = local.agent_platform_sandbox
-  name               = replace("${var.name_prefix}_${var.environment}_functions", "-", "_")
-  description        = "Agent platform function sandbox: VPC mode, no network egress"
-  execution_role_arn = aws_iam_role.agent_sandbox[0].arn
-  network_configuration {
-    network_mode = "VPC"
-    vpc_config {
-      security_groups = [aws_security_group.agent_sandbox[0].id]
-      subnets         = local.network.private_subnet_ids
-    }
-  }
-  tags = local.tags
-}
-
-# OpenSandbox (github.com/opensandbox-group/OpenSandbox): its controller and API server, from the
-# release chart vendored in charts/opensandbox (1.2.0, Apache-2.0), images pinned by digest. Only
-# its CRDs, controller and server are vendored (not upstream's fast-sandbox runtime, ingress gateway
-# or node agent): the platform is the only client and calls the server in-cluster. Each function call or build is a pod in the opensandbox namespace, with an
-# egress sidecar that denies everything the call is not allowed to reach.
-#
-# The server's API key is the Secrets Manager entry opensandbox-api-key (add it to secret_names and
-# set its value outside Terraform). The ChainDB chart syncs it into the platform's Secret and into
-# this namespace (agentPlatform.sandbox.opensandboxNamespace), so the server starts once the chart
-# is installed: Terraform does not wait for it.
-resource "kubernetes_namespace_v1" "opensandbox_sandboxes" {
-  count = local.opensandbox
+# The function sandbox: each call is one pod in this namespace, which the platform creates and
+# deletes itself (ChainDB/agent-platform/sandbox/aws.ts), in a Nitro sandbox of its own. Nothing
+# else runs here and no Secret lives here. Pod Security `restricted` and the admission policy in
+# helm_release.sandbox_nodes bound what the platform's Role can make here, even if the platform is
+# compromised: no privileged or host pods, and every pod in a Nitro VM with no network or token.
+resource "kubernetes_namespace_v1" "sandboxes" {
+  count = local.aws_sandbox
   metadata {
-    name = "opensandbox"
+    name   = local.sandbox_namespace
+    labels = { "pod-security.kubernetes.io/enforce" = "restricted" }
   }
 }
 
-# A second layer under the egress sidecar's per-sandbox domain allowlist (dns+nft), enforced by the
-# VPC CNI on the node, outside the pod. Nothing may connect in except the OpenSandbox server, which
-# relays every platform call to execd (44772) and the egress sidecar's API (18080) on the pod IP.
-# Out: cluster DNS, and public addresses only, so no private range (the VPC, the service network,
-# instance metadata, other clusters) is reachable whatever a sandbox's allowlist says. The pod's own
-# node is the CNI's one exception (kubelet probes), which the sidecar still blocks.
-data "aws_vpc" "network" {
-  count = local.opensandbox
-  id    = local.network.vpc_id
-}
-
-resource "kubernetes_network_policy_v1" "opensandbox_sandboxes" {
-  count = local.opensandbox
+# Nothing in or out. A function pod has no network interface at all (the platform asks for a VM
+# without one and talks to it through the Kubernetes API, and the admission policy below refuses a
+# pod without that). This policy states the same; it is enforced only where the cluster's VPC CNI
+# enforces network policies, which the aws sandbox does not turn on.
+resource "kubernetes_network_policy_v1" "sandboxes" {
+  count = local.aws_sandbox
   metadata {
     name      = "sandboxes"
-    namespace = kubernetes_namespace_v1.opensandbox_sandboxes[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.sandboxes[0].metadata[0].name
   }
   spec {
     pod_selector {}
     policy_types = ["Ingress", "Egress"]
-
-    ingress {
-      from {
-        namespace_selector {
-          match_labels = { "kubernetes.io/metadata.name" = helm_release.opensandbox[0].namespace }
-        }
-        pod_selector {
-          match_labels = { "app.kubernetes.io/name" = "opensandbox-server" }
-        }
-      }
-    }
-
-    egress {
-      to {
-        namespace_selector {
-          match_labels = { "kubernetes.io/metadata.name" = "kube-system" }
-        }
-        pod_selector {
-          match_labels = { "k8s-app" = "kube-dns" }
-        }
-      }
-      ports {
-        protocol = "UDP"
-        port     = "53"
-      }
-      ports {
-        protocol = "TCP"
-        port     = "53"
-      }
-    }
-
-    egress {
-      to {
-        ip_block {
-          cidr = "0.0.0.0/0"
-          except = distinct(concat(
-            ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"],
-            [for a in data.aws_vpc.network[0].cidr_block_associations : a.cidr_block],
-          ))
-        }
-      }
-    }
-  }
-
-  lifecycle {
-    precondition {
-      condition     = var.ingress_scheme != "internal"
-      error_message = "OpenSandbox sandboxes reach only public addresses, so their function callbacks cannot reach an internal load balancer: OpenSandbox needs ingress_scheme = \"internet-facing\"."
-    }
   }
 }
 
-# Every sandbox container gets requests and limits (the egress sidecar and execd installer set none
-# of their own), so the quota can count them and no sandbox runs unbounded.
-resource "kubernetes_limit_range_v1" "opensandbox_sandboxes" {
-  count = local.opensandbox
+# How many function pods may run at once and their total CPU and memory. A pod over the quota is
+# refused (the call fails) rather than waiting for room.
+resource "kubernetes_resource_quota_v1" "sandboxes" {
+  count = local.aws_sandbox
   metadata {
     name      = "sandboxes"
-    namespace = kubernetes_namespace_v1.opensandbox_sandboxes[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.sandboxes[0].metadata[0].name
   }
-  spec {
-    # max must cover the sandbox container's 1 CPU / 2Gi (the OpenSandbox SDK's default, which the
-    # platform keeps), or every sandbox is refused.
-    limit {
-      type            = "Container"
-      default_request = { cpu = "100m", memory = "128Mi" }
-      default         = { cpu = "500m", memory = "512Mi" }
-      max             = { cpu = "2", memory = "4Gi" }
-    }
-  }
-}
-
-resource "kubernetes_resource_quota_v1" "opensandbox_sandboxes" {
-  count = local.opensandbox
-  metadata {
-    name      = "sandboxes"
-    namespace = kubernetes_namespace_v1.opensandbox_sandboxes[0].metadata[0].name
-  }
-  # How many sandboxes may run at once and their total CPU and memory. A sandbox over the quota fails
-  # to start (the call fails) rather than waiting for room.
   spec {
     hard = {
       pods              = "30"
@@ -327,72 +171,140 @@ resource "kubernetes_resource_quota_v1" "opensandbox_sandboxes" {
   }
 }
 
-resource "helm_release" "opensandbox" {
-  count            = local.opensandbox
-  name             = "opensandbox"
-  chart            = "${path.module}/charts/opensandbox"
-  namespace        = "opensandbox-system"
-  create_namespace = true
-  wait             = false
+# All the platform may do in the cluster: make, read and delete pods here, and open the exec stream
+# that carries a call into its pod.
+resource "kubernetes_role_v1" "sandboxes" {
+  count = local.aws_sandbox
+  metadata {
+    name      = "agent-platform"
+    namespace = kubernetes_namespace_v1.sandboxes[0].metadata[0].name
+  }
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["create", "get", "delete"]
+  }
+  # The exec stream is a WebSocket upgrade, which EKS 1.36 authorizes as `get`; Kubernetes is moving
+  # it to `create` (AuthorizePodWebsocketUpgradeCreatePermission), so both.
+  rule {
+    api_groups = [""]
+    resources  = ["pods/exec"]
+    verbs      = ["create", "get"]
+  }
+}
+
+resource "kubernetes_role_binding_v1" "sandboxes" {
+  count = local.aws_sandbox
+  metadata {
+    name      = "agent-platform"
+    namespace = kubernetes_namespace_v1.sandboxes[0].metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.sandboxes[0].metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = "agent-platform"
+    namespace = var.arbium_namespace
+  }
+}
+
+# The Auto Mode nodes function pods run on, tainted for them only (the platform's pods tolerate it).
+# A static pool: one node is always up, so a call never waits for a node to boot.
+# ponytail: one node holds about ten function pods at once (the 16 GiB floor); add a second, scaling
+# NodePool for bursts when calls start waiting. Their kinds exist only once Auto Mode is on, which
+# is why they go through a chart and not kubernetes_manifest: if this release applies first, apply again.
+resource "helm_release" "sandbox_nodes" {
+  count     = local.aws_sandbox
+  name      = "sandbox-nodes"
+  chart     = "${path.module}/charts/sandbox-nodes"
+  namespace = kubernetes_namespace_v1.sandboxes[0].metadata[0].name
+  wait      = false
   values = [yamlencode({
-    opensandbox-controller = {
-      controller = {
-        image = {
-          repository = "docker.io/opensandbox/controller"
-          tag        = "release-1.2.0@sha256:7701db7eacda4c3533a961e0451f6ce067535d8ce46f15765a04dcf0ffa6e2c6"
+    objects = [
+      {
+        apiVersion = "eks.amazonaws.com/v1"
+        kind       = "NodeClass"
+        metadata   = { name = "sandboxes" }
+        spec = {
+          role                       = module.eks.auto_node_role_name
+          subnetSelectorTerms        = [for id in local.network.private_subnet_ids : { id = id }]
+          securityGroupSelectorTerms = [{ id = module.eks.cluster_security_group_id }]
+          tags                       = local.tags
         }
-      }
-    }
-    opensandbox-server = {
-      server = {
-        image = {
-          repository = "docker.io/opensandbox/server"
-          tag        = "release-1.2.0@sha256:25bebdcf1cf7724eb923faecbdbbf82d4038c6ab35c736151574726d14006f30"
+      },
+      {
+        apiVersion = "karpenter.sh/v1"
+        kind       = "NodePool"
+        metadata   = { name = "sandboxes" }
+        spec = {
+          replicas = 1
+          limits   = { nodes = 2 } # room to replace the node on an AMI update
+          template = {
+            metadata = { labels = { workload = "sandbox" } }
+            spec = {
+              nodeClassRef = { group = "eks.amazonaws.com", kind = "NodeClass", name = "sandboxes" }
+              taints       = [{ key = "workload", value = "sandbox", effect = "NoSchedule" }]
+              requirements = [
+                { key = "eks.amazonaws.com/nitro-sandbox", operator = "In", values = ["true"] },
+                { key = "karpenter.sh/capacity-type", operator = "In", values = ["on-demand"] },
+                { key = "kubernetes.io/arch", operator = "In", values = ["amd64"] },
+                { key = "eks.amazonaws.com/instance-category", operator = "In", values = ["m", "c", "r"] },
+                { key = "eks.amazonaws.com/instance-memory", operator = "Gt", values = ["15000"] },
+              ]
+            }
+          }
         }
-        resources = {
-          requests = { cpu = "100m", memory = "256Mi" }
-          limits   = { cpu = "1", memory = "1Gi" }
+      },
+      # Every pod made in the namespace is a function pod: in a Nitro VM, without a network interface,
+      # without a service account token. Pod fields are fixed at creation, so creation is checked.
+      {
+        apiVersion = "admissionregistration.k8s.io/v1"
+        kind       = "ValidatingAdmissionPolicy"
+        metadata   = { name = "agent-function-pods" }
+        spec = {
+          failurePolicy = "Fail"
+          matchConstraints = {
+            resourceRules = [{ apiGroups = [""], apiVersions = ["v1"], operations = ["CREATE"], resources = ["pods"] }]
+          }
+          validations = [
+            {
+              expression = "has(object.spec.runtimeClassName) && object.spec.runtimeClassName == 'isolated-sandbox'"
+              message    = "A function pod runs in a Nitro sandbox (runtimeClassName isolated-sandbox)."
+            },
+            {
+              expression = "has(object.metadata.annotations) && 'sandbox.amazonaws.com/network-isolated' in object.metadata.annotations && object.metadata.annotations['sandbox.amazonaws.com/network-isolated'] == 'true'"
+              message    = "A function pod has no network interface (sandbox.amazonaws.com/network-isolated: \"true\")."
+            },
+            {
+              expression = "has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false"
+              message    = "A function pod has no service account token."
+            },
+          ]
         }
-        env = [{
-          name      = "OPENSANDBOX_SERVER_API_KEY"
-          valueFrom = { secretKeyRef = { name = "opensandbox-api-key", key = "api-key" } }
-        }]
-        # The server reads the template once at start: a change to it rolls the pod.
-        podAnnotations = { "checksum/batchsandbox-template" = sha256(yamlencode(local.opensandbox_template)) }
-        volumes        = [{ name = "batchsandbox-template", configMap = { name = "opensandbox-batchsandbox-template" } }]
-        volumeMounts = [{
-          name      = "batchsandbox-template"
-          mountPath = "/etc/opensandbox/arbium"
-          readOnly  = true
-        }]
-      }
-      configToml = <<-EOT
-        [server]
-        host = "0.0.0.0"
-        port = 80
-        [log]
-        level = "INFO"
-        [runtime]
-        type = "kubernetes"
-        execd_image = "docker.io/opensandbox/execd:release-1.2.0@sha256:c75836c46ef4302afccec182d5d7339eb2f905f51e3d73b7aa17bb76c832526c"
-        [kubernetes]
-        namespace = "${kubernetes_namespace_v1.opensandbox_sandboxes[0].metadata[0].name}"
-        workload_provider = "batchsandbox"
-        batchsandbox_template_file = "/etc/opensandbox/arbium/template.yaml"
-        [egress]
-        image = "docker.io/opensandbox/egress:release-1.2.0@sha256:a3d30246e557525f3fa44d16226258268cea175532e652822bd1eb4e83e0f54d"
-        mode = "dns+nft"
-      EOT
-    }
-    batchsandboxTemplate = local.opensandbox_template
+      },
+      {
+        apiVersion = "admissionregistration.k8s.io/v1"
+        kind       = "ValidatingAdmissionPolicyBinding"
+        metadata   = { name = "agent-function-pods" }
+        spec = {
+          policyName        = "agent-function-pods"
+          validationActions = ["Deny"]
+          matchResources = {
+            namespaceSelector = { matchLabels = { "kubernetes.io/metadata.name" = local.sandbox_namespace } }
+          }
+        }
+      },
+    ]
   })]
   # No depends_on: the helm provider already waits for the cluster, and a dependency on module.eks
-  # would put every node group in a targeted plan of this release. On a first install in the same
-  # apply as the load balancer controller, its webhook may not answer yet: apply again.
+  # would put every node group in a targeted plan of this release.
 }
 
 output "agent_platform" {
-  description = "Helm handoff for agentPlatform: the service account role, the certificate (publish its validation record, then add its ARN to ingress.certificateArn), agentPlatform.sandbox.env and, for OpenSandbox, agentPlatform.sandbox.opensandboxNamespace."
+  description = "Helm handoff for agentPlatform: the service account role, the certificate (publish its validation record, then add its ARN to ingress.certificateArn) and, for the aws sandbox, agentPlatform.sandbox.namespace and agentPlatform.sandbox.env (add the image and, after the isolation checks, the gate)."
   value = var.enable_agent_platform ? {
     role_arn        = aws_iam_role.agent_platform[0].arn
     certificate_arn = one(aws_acm_certificate.agent_platform[*].arn)
@@ -403,15 +315,8 @@ output "agent_platform" {
         value = option.resource_record_value
       }
     ]
-    sandbox_env = local.agent_platform_sandbox == 1 ? {
-      AWS_SANDBOX_INTERPRETER_ARN           = aws_bedrockagentcore_code_interpreter.agent_sandbox[0].code_interpreter_arn
-      AWS_SANDBOX_VALIDATED_ROLE            = aws_iam_role.agent_sandbox[0].arn
-      AWS_SANDBOX_VALIDATED_SUBNETS         = join(",", local.network.private_subnet_ids)
-      AWS_SANDBOX_VALIDATED_SECURITY_GROUPS = aws_security_group.agent_sandbox[0].id
-      } : {
-      OPENSANDBOX_URL                = "http://opensandbox-server.${helm_release.opensandbox[0].namespace}.svc.cluster.local"
-      OPENSANDBOX_ALLOW_PRIVATE_HTTP = "true"
-    }
-    opensandbox_namespace = local.opensandbox == 1 ? helm_release.opensandbox[0].namespace : null
+    sandbox_namespace = local.aws_sandbox == 1 ? local.sandbox_namespace : null
+    # The runtime class EKS Auto Mode makes for Nitro sandboxes.
+    sandbox_env = local.aws_sandbox == 1 ? tomap({ AWS_SANDBOX_RUNTIME_CLASS = "isolated-sandbox" }) : tomap({})
   } : null
 }

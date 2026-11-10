@@ -12,7 +12,8 @@ resource "aws_iam_role" "cluster" {
     Statement = [{
       Effect    = "Allow"
       Principal = { Service = "eks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
+      # Auto Mode tags what it launches with the cluster's session. IAM reads ["x"] as "x": no diff.
+      Action = concat(["sts:AssumeRole"], var.enable_auto_mode ? ["sts:TagSession"] : [])
     }]
   })
 
@@ -20,9 +21,13 @@ resource "aws_iam_role" "cluster" {
 }
 
 resource "aws_iam_role_policy_attachment" "cluster" {
-  for_each = toset([
-    "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKSClusterPolicy",
-  ])
+  for_each = toset(concat(
+    ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKSClusterPolicy"],
+    var.enable_auto_mode ? [
+      for p in ["AmazonEKSComputePolicy", "AmazonEKSBlockStoragePolicy", "AmazonEKSLoadBalancingPolicy", "AmazonEKSNetworkingPolicy"] :
+      "arn:${data.aws_partition.current.partition}:iam::aws:policy/${p}"
+    ] : [],
+  ))
 
   role       = aws_iam_role.cluster.name
   policy_arn = each.value
@@ -42,6 +47,33 @@ resource "aws_eks_cluster" "this" {
   access_config {
     authentication_mode                         = "API_AND_CONFIG_MAP"
     bootstrap_cluster_creator_admin_permissions = true
+  }
+
+  # EKS Auto Mode, for Nitro sandbox nodes only: no built-in node pools, so it launches a node only
+  # for a NodePool someone adds (the agent platform's sandboxes) and nothing else moves. AWS turns
+  # its compute, block storage and load balancing on together; the existing load balancer
+  # controller and EBS driver keep their own classes.
+  dynamic "compute_config" {
+    for_each = var.enable_auto_mode ? [1] : []
+    content {
+      enabled = true
+    }
+  }
+  dynamic "kubernetes_network_config" {
+    for_each = var.enable_auto_mode ? [1] : []
+    content {
+      elastic_load_balancing {
+        enabled = true
+      }
+    }
+  }
+  dynamic "storage_config" {
+    for_each = var.enable_auto_mode ? [1] : []
+    content {
+      block_storage {
+        enabled = true
+      }
+    }
   }
 
   tags = var.tags
@@ -73,6 +105,99 @@ resource "aws_iam_role_policy_attachment" "nodes" {
 
   role       = aws_iam_role.nodes.name
   policy_arn = each.value
+}
+
+# AWS's managed Auto Mode policies refuse tags of our own on what Auto Mode launches, and an install
+# whose account requires tags at launch needs them: AWS's custom-tag policy, its EC2 statements only
+# (docs.aws.amazon.com/eks/latest/userguide/auto-cluster-iam-role.html#tag-prop).
+resource "aws_iam_role_policy" "auto_mode_tags" {
+  count = var.enable_auto_mode ? 1 : 0
+  name  = "auto-mode-tags"
+  role  = aws_iam_role.cluster.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "Compute"
+        Effect   = "Allow"
+        Action   = ["ec2:CreateFleet", "ec2:RunInstances", "ec2:CreateLaunchTemplate"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "aws:RequestTag/eks:eks-cluster-name" = "$${aws:PrincipalTag/eks:eks-cluster-name}" }
+          StringLike   = { "aws:RequestTag/eks:kubernetes-node-class-name" = "*", "aws:RequestTag/eks:kubernetes-node-pool-name" = "*" }
+        }
+      },
+      {
+        Sid       = "Storage"
+        Effect    = "Allow"
+        Action    = ["ec2:CreateVolume", "ec2:CreateSnapshot"]
+        Resource  = ["arn:${data.aws_partition.current.partition}:ec2:*:*:volume/*", "arn:${data.aws_partition.current.partition}:ec2:*:*:snapshot/*"]
+        Condition = { StringEquals = { "aws:RequestTag/eks:eks-cluster-name" = "$${aws:PrincipalTag/eks:eks-cluster-name}" } }
+      },
+      {
+        Sid      = "Networking"
+        Effect   = "Allow"
+        Action   = "ec2:CreateNetworkInterface"
+        Resource = "*"
+        Condition = {
+          StringEquals = { "aws:RequestTag/eks:eks-cluster-name" = "$${aws:PrincipalTag/eks:eks-cluster-name}" }
+          StringLike   = { "aws:RequestTag/eks:kubernetes-cni-node-name" = "*" }
+        }
+      },
+      {
+        Sid       = "ModifyTagsOnClusterResources"
+        Effect    = "Allow"
+        Action    = ["ec2:CreateTags", "ec2:DeleteTags"]
+        Resource  = "*"
+        Condition = { StringEquals = { "aws:ResourceTag/eks:eks-cluster-name" = "$${aws:PrincipalTag/eks:eks-cluster-name}" } }
+      },
+    ]
+  })
+}
+
+# The role Auto Mode nodes run as. With no built-in node pools EKS makes no access entry for it.
+resource "aws_iam_role" "auto_nodes" {
+  count = var.enable_auto_mode ? 1 : 0
+  name  = "${local.cluster_name}-eks-auto-nodes"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "auto_nodes" {
+  for_each = toset(var.enable_auto_mode ? [
+    "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKSWorkerNodeMinimalPolicy",
+    "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly",
+  ] : [])
+
+  role       = aws_iam_role.auto_nodes[0].name
+  policy_arn = each.value
+}
+
+resource "aws_eks_access_entry" "auto_nodes" {
+  count         = var.enable_auto_mode ? 1 : 0
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = aws_iam_role.auto_nodes[0].arn
+  type          = "EC2"
+  tags          = var.tags
+}
+
+resource "aws_eks_access_policy_association" "auto_nodes" {
+  count         = var.enable_auto_mode ? 1 : 0
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = aws_eks_access_entry.auto_nodes[0].principal_arn
+  policy_arn    = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSAutoNodePolicy"
+  access_scope {
+    type = "cluster"
+  }
 }
 
 # Managed node groups do NOT propagate node-group tags to the launched EC2

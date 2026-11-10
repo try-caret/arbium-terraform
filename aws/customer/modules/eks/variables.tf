@@ -34,3 +34,9 @@ variable "enable_network_policy" {
   type    = bool
   default = false
 }
+
+variable "enable_auto_mode" {
+  description = "Turn on EKS Auto Mode with no built-in node pools (Kubernetes 1.36+ for Nitro sandboxes). It launches nodes only for NodePools added to the cluster."
+  type        = bool
+  default     = false
+}

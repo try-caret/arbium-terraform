@@ -1,0 +1,3 @@
+# Whole objects to render as they are: the Auto Mode NodeClass and NodePool for Nitro sandbox nodes,
+# and the admission policy and its binding for function pods.
+objects: []
