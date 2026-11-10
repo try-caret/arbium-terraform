@@ -36,6 +36,14 @@ off (the default) and on for Nitro sandbox nodes.
 covers the opt-in GPU sharing: off by default with the device plugin's values unchanged, the time-slicing
 config for 2 replicas, and rejection of 0, more than 16, or sharing without the device plugin.
 
+`tests/vpc-cni.tftest.hcl` (same isolated-copy recipe, `-filter=tests/vpc-cni.tftest.hcl`)
+tests `modules/eks` directly with mocked AWS/TLS providers. It checks that the default
+CNI JSON is unchanged, a larger reserve is encoded as a string without changing the
+minimum allocation or tags, network-policy enforcement survives a reserve override,
+other add-ons remain unconfigured, a reserve of one is accepted, and zero, negative,
+fractional and null reserves are rejected. These mocked plans do not establish live
+subnet capacity or guarantee that a chosen reserve covers every scheduling burst.
+
 `tests/aurora-performance-insights.tftest.hcl` (same isolated-copy recipe, `-filter=tests/aurora-performance-insights.tftest.hcl`)
 covers the Aurora module's Performance Insights: on with 7 days by default, no retention sent when off, a longer retention
 passed through, and rejection of retention values AWS does not accept (accepts 7, 731 and multiples of 31 up to 713).

@@ -383,10 +383,9 @@ resource "aws_eks_addon" "this" {
 
   # IP-efficient warm pool so the stack fits a /24 VPC. By default the CNI keeps
   # a whole spare ENI warm (~10-15 IPs held per node even near-idle), which
-  # exhausts a /26 per-AZ subnet fast. WARM_IP_TARGET holds only (running pods
-  # + 2) IPs; MINIMUM_IP_TARGET keeps a small floor so fresh nodes schedule
-  # their first pods without an extra EC2 AllocateIPs round-trip. Trade-off:
-  # slightly more EC2 API calls under burst scheduling — negligible here.
+  # exhausts a /26 per-AZ subnet fast. Keep the default reserve small; environments
+  # with enough subnet capacity can raise it to cover bursts and IP cooldown.
+  # MINIMUM_IP_TARGET keeps a floor for the first pods on a fresh node.
   #
   # ADDITIONAL_ENI_TAGS propagates the env tags onto the secondary ENIs the CNI
   # creates for pods at runtime via the node role (Terraform's default_tags
@@ -395,7 +394,7 @@ resource "aws_eks_addon" "this" {
   configuration_values = each.value == "vpc-cni" ? jsonencode(merge(
     {
       env = {
-        WARM_IP_TARGET      = "2"
+        WARM_IP_TARGET      = tostring(var.vpc_cni_warm_ip_target)
         MINIMUM_IP_TARGET   = "8"
         ADDITIONAL_ENI_TAGS = jsonencode(var.tags)
       }

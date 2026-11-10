@@ -179,6 +179,17 @@ variable "cluster_endpoint_private_access" {
   default     = true
 }
 
+variable "vpc_cni_warm_ip_target" {
+  description = "Number of spare pod IPv4 addresses the VPC CNI attempts to keep per node. Larger reserves absorb pod-start bursts but consume more subnet addresses."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.vpc_cni_warm_ip_target == null ? false : var.vpc_cni_warm_ip_target >= 1 && floor(var.vpc_cni_warm_ip_target) == var.vpc_cni_warm_ip_target
+    error_message = "vpc_cni_warm_ip_target must be a positive integer."
+  }
+}
+
 variable "enable_node_launch_template" {
   description = "Attach a launch template to the managed node groups so the required tags propagate to EC2 instances, EBS volumes, and primary ENIs. Off by default; enabling replaces existing node groups. Set true for tag-enforced customer accounts."
   type        = bool

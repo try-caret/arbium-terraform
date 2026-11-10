@@ -112,6 +112,7 @@ module "eks" {
   subnet_ids                      = local.network.private_subnet_ids
   cluster_endpoint_public_access  = var.cluster_endpoint_public_access
   cluster_endpoint_private_access = var.cluster_endpoint_private_access
+  vpc_cni_warm_ip_target          = var.vpc_cni_warm_ip_target
   general_node_instance_types     = var.general_node_instance_types
   general_node_min_size           = var.general_node_min_size
   general_node_desired_size       = var.general_node_desired_size

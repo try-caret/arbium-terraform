@@ -24,6 +24,17 @@ variable "tags" {
   default = {}
 }
 
+variable "vpc_cni_warm_ip_target" {
+  description = "Number of spare pod IPv4 addresses the VPC CNI attempts to keep per node. Larger reserves absorb pod-start bursts but consume more subnet addresses."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.vpc_cni_warm_ip_target == null ? false : var.vpc_cni_warm_ip_target >= 1 && floor(var.vpc_cni_warm_ip_target) == var.vpc_cni_warm_ip_target
+    error_message = "vpc_cni_warm_ip_target must be a positive integer."
+  }
+}
+
 variable "enable_node_launch_template" {
   description = "Attach a launch template to the managed node groups so tags propagate to the EC2 instances, EBS volumes, and primary ENIs (which EKS does NOT tag from node-group tags). Off by default; enabling it replaces existing node groups, so opt in per environment."
   type        = bool

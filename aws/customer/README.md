@@ -20,6 +20,7 @@ Regardless of network mode:
   - `general` for app workloads.
   - `embedder-gpu` tainted `workload=embedder:NO_SCHEDULE` for the HTTP embedder. The default instance is `g4dn.xlarge`; move to `g5`/`g6` only if throughput requires it.
 - EKS managed add-ons: VPC CNI, CoreDNS, kube-proxy. EBS CSI is deferred until a workload needs persistent volumes and we add a dedicated IRSA role.
+- Pod-IP reserve (`vpc_cni_warm_ip_target`, default 2): the number of spare addresses the VPC CNI attempts to keep per node. Increase it per environment to absorb simultaneous pod starts and address cooldown, after checking subnet capacity. Larger reserves hold more subnet addresses; the minimum total allocation remains 8 per node.
 - IAM OIDC provider and workload/controller IRSA roles.
 - Aurora PostgreSQL Serverless v2.
 - Secrets Manager secret containers only; secret values are populated out-of-band.
