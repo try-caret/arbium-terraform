@@ -39,6 +39,36 @@ variable "pubsub_service_agent_email" {
     error_message = "pubsub_service_agent_email is required when project services are managed elsewhere."
   }
 }
+variable "freshness_threshold_seconds" {
+  type        = number
+  default     = 60
+  description = <<-EOT
+    Threshold of the source freshness alarm: oldest_unacked_message_age above this for freshness_duration_seconds.
+    60 is the product target and stays the default. An environment whose writer holds a queue commit window
+    (capturelake.writer.env CAPTURE_QUEUE_COMMIT_WINDOW_MS) sets it to the window plus the commit plus margin,
+    because held messages are received but not acked, so Pub/Sub counts them as unacked and old. Between 60 and
+    600 (a sanity cap); what bounds the page time is the sum with freshness_duration_seconds, see there.
+  EOT
+  validation {
+    condition     = var.freshness_threshold_seconds >= 60 && var.freshness_threshold_seconds <= 600
+    error_message = "freshness_threshold_seconds must be between 60 (the freshness target) and 600."
+  }
+}
+variable "freshness_duration_seconds" {
+  type        = number
+  default     = 300
+  description = <<-EOT
+    How long the source freshness alarm's condition must hold before it pages, in whole minutes (Cloud Monitoring
+    durations are multiples of 60 s). The alarm pages at about freshness_threshold_seconds plus this, after the
+    oldest unacked message first crossed the threshold, plus the metric's alignment and ingestion delay. That sum may not pass 600: the downstream derive step seals
+    an episode 10 minutes after its last capture, and an alarm that pages later than that pages after the episode
+    is sealed without the capture, which a late capture then cannot join. Default 300 keeps the original alarm.
+  EOT
+  validation {
+    condition     = var.freshness_duration_seconds >= 60 && var.freshness_duration_seconds % 60 == 0
+    error_message = "freshness_duration_seconds must be a whole number of minutes, at least 60."
+  }
+}
 
 resource "google_project_service" "queue" {
   for_each           = var.manage_project_services ? toset(["pubsub.googleapis.com", "monitoring.googleapis.com"]) : toset([])
@@ -134,10 +164,12 @@ resource "google_cloud_run_v2_service_iam_member" "embedder" {
   member   = "serviceAccount:${each.value}"
 }
 
-# Use native subscription backlog/in-flight dashboards; no custom queue telemetry service.
+# Use native subscription backlog/in-flight dashboards; no custom queue telemetry service. The freshness
+# threshold and duration are variables because a held commit window makes a healthy writer's oldest unacked message
+# as old as the window.
 resource "google_monitoring_alert_policy" "queue" {
   for_each = {
-    freshness = { dlq = false, metric = "oldest_unacked_message_age", threshold = 60, duration = "300s" }
+    freshness = { dlq = false, metric = "oldest_unacked_message_age", threshold = var.freshness_threshold_seconds, duration = "${var.freshness_duration_seconds}s" }
     outage    = { dlq = false, metric = "oldest_unacked_message_age", threshold = 86400, duration = "60s" }
     dlq       = { dlq = true, metric = "num_undelivered_messages", threshold = 0, duration = "60s" }
     dlq_age   = { dlq = true, metric = "oldest_unacked_message_age", threshold = 3600, duration = "60s" }
@@ -162,6 +194,13 @@ resource "google_monitoring_alert_policy" "queue" {
   documentation {
     content   = "Investigate capture backlog before derive lookback or finite retention expires. Follow the [customer recovery procedure](https://github.com/try-caret/arbium-terraform/blob/main/aws/customer/QUEUE_RECOVERY.md) (also included in the pinned release); do not replay without fixing the cause."
     mime_type = "text/markdown"
+  }
+  lifecycle {
+    precondition {
+      # Checked on the freshness instance only, so a bad pair fails once instead of once per alarm.
+      condition     = each.key != "freshness" || var.freshness_threshold_seconds + var.freshness_duration_seconds <= 600
+      error_message = "The freshness alarm pages at about freshness_threshold_seconds + freshness_duration_seconds (plus the metric's ingestion delay), which may not pass 600 (derive seals an episode 10 minutes after its last capture)."
+    }
   }
   depends_on = [google_project_service.queue]
 }

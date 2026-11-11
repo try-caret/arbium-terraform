@@ -60,6 +60,74 @@ run "private_embedder_grants_both_paths" {
     error_message = "Queued and rollback embedding both need Cloud Run invocation rights."
   }
 }
+# An environment whose writer holds a queue commit window (for example a 300 s threshold for 180 s) raises the
+# freshness threshold and shortens its duration. The defaults stay 60 s for 300 s for every other environment, the
+# other three alarms never move, and the page time (threshold + duration) may not pass 600 s, the derive seal.
+run "freshness_defaults_to_the_60s_target_for_300s" {
+  command = plan
+  assert {
+    condition     = google_monitoring_alert_policy.queue["freshness"].conditions[0].condition_threshold[0].threshold_value == 60 && google_monitoring_alert_policy.queue["freshness"].conditions[0].condition_threshold[0].duration == "300s"
+    error_message = "Without the variables the freshness alarm must stay at 60 s for 300 s."
+  }
+}
+run "freshness_threshold_and_duration_are_configurable" {
+  command = plan
+  variables {
+    freshness_threshold_seconds = 300
+    freshness_duration_seconds  = 180
+  }
+  assert {
+    condition     = google_monitoring_alert_policy.queue["freshness"].conditions[0].condition_threshold[0].threshold_value == 300 && google_monitoring_alert_policy.queue["freshness"].conditions[0].condition_threshold[0].duration == "180s"
+    error_message = "The freshness alarm must follow both variables."
+  }
+  assert {
+    condition     = google_monitoring_alert_policy.queue["outage"].conditions[0].condition_threshold[0].threshold_value == 86400 && google_monitoring_alert_policy.queue["dlq"].conditions[0].condition_threshold[0].threshold_value == 0 && google_monitoring_alert_policy.queue["dlq_age"].conditions[0].condition_threshold[0].threshold_value == 3600
+    error_message = "Only the freshness threshold may follow the variable."
+  }
+  assert {
+    condition     = google_monitoring_alert_policy.queue["outage"].conditions[0].condition_threshold[0].duration == "60s" && google_monitoring_alert_policy.queue["dlq"].conditions[0].condition_threshold[0].duration == "60s" && google_monitoring_alert_policy.queue["dlq_age"].conditions[0].condition_threshold[0].duration == "60s"
+    error_message = "Only the freshness duration may follow the variable."
+  }
+}
+run "accept_page_time_at_exactly_600s" {
+  command = plan
+  variables {
+    freshness_threshold_seconds = 420
+    freshness_duration_seconds  = 180
+  }
+  assert {
+    condition     = google_monitoring_alert_policy.queue["freshness"].conditions[0].condition_threshold[0].threshold_value == 420
+    error_message = "A page time of exactly 600 s is accepted."
+  }
+}
+run "reject_page_time_past_600s" {
+  command = plan
+  variables {
+    freshness_threshold_seconds = 420
+    freshness_duration_seconds  = 240
+  }
+  expect_failures = [google_monitoring_alert_policy.queue]
+}
+run "reject_freshness_below_the_60s_target" {
+  command = plan
+  variables { freshness_threshold_seconds = 59 }
+  expect_failures = [var.freshness_threshold_seconds]
+}
+run "reject_freshness_threshold_above_600s" {
+  command = plan
+  variables { freshness_threshold_seconds = 601 }
+  expect_failures = [var.freshness_threshold_seconds]
+}
+run "reject_freshness_duration_off_the_minute" {
+  command = plan
+  variables { freshness_duration_seconds = 150 }
+  expect_failures = [var.freshness_duration_seconds]
+}
+run "reject_freshness_duration_under_a_minute" {
+  command = plan
+  variables { freshness_duration_seconds = 0 }
+  expect_failures = [var.freshness_duration_seconds]
+}
 run "reject_unrouted_alerts" {
   command = plan
   variables { notification_channels = [] }
