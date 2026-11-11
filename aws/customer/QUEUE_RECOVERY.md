@@ -48,7 +48,7 @@ an attended on-call destination and test delivery before enablement.
 
 | Alarm | Response |
 | --- | --- |
-| Source age >60 seconds sustained for 5 minutes | Investigate loss of freshness now; check writer readiness, embedding and storage/catalog dependencies |
+| Source age above the freshness threshold (60 seconds by default) for the evaluation periods (5 minutes by default) | Investigate loss of freshness now; check writer readiness, embedding and storage/catalog dependencies |
 | Source age >24 hours | Escalate outage recovery and remaining retention; plan catch-up while new uploads continue |
 | Any visible dead-letter messages | Investigate immediately; these can be valid uploads, not disposable bad data |
 | Dead-letter age >1 hour | Escalate repair/replay; do not wait for expiration |
@@ -66,7 +66,11 @@ on the source subscription for forwarding/counting. Keep the DLQ subscription pr
 
 Freshness alerts remain active during deployments, maintenance and catch-up. Do not
 silently relax the 60-second target or suppress alerts; any maintenance silence needs
-explicit operator approval. Queue age is a warning signal, not proof of end-to-end
+explicit operator approval. The one exception is an install whose writer holds a queue
+commit window: held messages count as old, so it sets `capture_queue_freshness_threshold_seconds`
+to the window plus the commit plus margin, in its own variables file. To keep the page before derive's
+10-minute seal it also lowers `capture_queue_freshness_evaluation_periods`; Terraform refuses a threshold plus
+60 s per period above 600 s. Queue age is a warning signal, not proof of end-to-end
 search freshness or achieved throughput. Client-side buffering before acceptance is
 volatile and limited; it is not protected by server queue retention.
 

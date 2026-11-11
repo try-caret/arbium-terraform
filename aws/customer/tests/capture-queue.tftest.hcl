@@ -46,6 +46,93 @@ run "queue_retention_iam_and_alarms" {
     error_message = "Every alarm must link to the customer recovery document shipped in the public mirror."
   }
 }
+# An install that holds a queue commit window raises the freshness threshold and lowers its periods. Both default to
+# 60 s and 5 periods for every other install, the other three alarms never move, and out-of-range values are refused.
+run "freshness_defaults_are_60s_and_5_periods" {
+  command = plan
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.capture_queue["freshness"].threshold == 60 && aws_cloudwatch_metric_alarm.capture_queue["freshness"].evaluation_periods == 5
+    error_message = "The freshness alarm must stay at 60 s and 5 periods unless the variables are set."
+  }
+}
+run "freshness_threshold_and_periods_are_configurable" {
+  command = plan
+  variables {
+    capture_queue_freshness_threshold_seconds  = 300
+    capture_queue_freshness_evaluation_periods = 3
+  }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.capture_queue["freshness"].threshold == 300 && aws_cloudwatch_metric_alarm.capture_queue["freshness"].evaluation_periods == 3
+    error_message = "The freshness threshold and periods must follow the variables."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.capture_queue["outage"].threshold == 86400 && aws_cloudwatch_metric_alarm.capture_queue["outage"].evaluation_periods == 1 && aws_cloudwatch_metric_alarm.capture_queue["dlq"].threshold == 0 && aws_cloudwatch_metric_alarm.capture_queue["dlq_age"].threshold == 3600
+    error_message = "Only the freshness alarm may follow the variables."
+  }
+}
+run "reject_freshness_below_the_60s_target" {
+  command = plan
+  variables { capture_queue_freshness_threshold_seconds = 59 }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_threshold_seconds]
+}
+run "reject_freshness_above_the_sanity_cap" {
+  command = plan
+  variables { capture_queue_freshness_threshold_seconds = 601 }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_threshold_seconds]
+}
+run "reject_freshness_periods_out_of_range" {
+  command = plan
+  variables { capture_queue_freshness_evaluation_periods = 0 }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_evaluation_periods]
+}
+run "reject_freshness_periods_above_5" {
+  command = plan
+  variables { capture_queue_freshness_evaluation_periods = 6 }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_evaluation_periods]
+}
+run "reject_freshness_periods_not_whole" {
+  command = plan
+  variables { capture_queue_freshness_evaluation_periods = 2.5 }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_evaluation_periods]
+}
+# The alarm pages at about threshold + periods x 60 s, which has to stay within the 600 s seal of an episode.
+run "reject_freshness_page_time_past_600s" {
+  command = plan
+  variables {
+    capture_queue_freshness_threshold_seconds  = 600
+    capture_queue_freshness_evaluation_periods = 5
+  }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_evaluation_periods]
+}
+run "reject_freshness_page_time_at_601s" {
+  command = plan
+  variables {
+    capture_queue_freshness_threshold_seconds  = 301
+    capture_queue_freshness_evaluation_periods = 5
+  }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  expect_failures = [var.capture_queue_freshness_evaluation_periods]
+}
+run "accept_freshness_page_time_at_exactly_600s" {
+  command = plan
+  variables {
+    capture_queue_freshness_threshold_seconds  = 300
+    capture_queue_freshness_evaluation_periods = 5
+  }
+  plan_options { target = [aws_cloudwatch_metric_alarm.capture_queue] }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.capture_queue["freshness"].threshold == 300 && aws_cloudwatch_metric_alarm.capture_queue["freshness"].evaluation_periods == 5
+    error_message = "A page time of exactly 600 s must be accepted."
+  }
+}
 run "reject_unrouted_alerts" {
   command = plan
   variables { capture_queue_alarm_actions = [] }

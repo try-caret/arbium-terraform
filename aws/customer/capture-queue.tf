@@ -15,6 +15,45 @@ variable "capture_queue_alarm_actions" {
   description = "Existing SNS topic ARNs to notify for source freshness, outage age and DLQ alarms."
 }
 
+variable "capture_queue_freshness_threshold_seconds" {
+  type        = number
+  default     = 60
+  description = <<-EOT
+    Threshold of the source freshness alarm: ApproximateAgeOfOldestMessage above this for the evaluation periods
+    below (one-minute periods). 60 is the product target and stays the default. An install whose writer holds a
+    queue commit window (capturelake.writer.env CAPTURE_QUEUE_COMMIT_WINDOW_MS) sets it to the window plus the
+    commit plus margin, because held messages are received but not deleted, so SQS counts them as old. The alarm
+    pages at about the threshold plus the evaluation periods (a stall past it), which has to stay under derive's
+    10-minute seal of an episode after its last capture. 600 is a sanity cap on the value, not the page time.
+    Terraform also refuses a threshold plus 60 x the evaluation periods above 600 (validation on the periods
+    variable); that sum excludes CloudWatch's report lag (about a minute, not measured).
+  EOT
+  validation {
+    condition     = var.capture_queue_freshness_threshold_seconds >= 60 && var.capture_queue_freshness_threshold_seconds <= 600
+    error_message = "capture_queue_freshness_threshold_seconds must be between 60 (the freshness target) and 600 (a sanity cap: the alarm pages at the threshold plus the evaluation periods, so keep that under derive's 10-minute seal)."
+  }
+}
+
+variable "capture_queue_freshness_evaluation_periods" {
+  type        = number
+  default     = 5
+  description = <<-EOT
+    Consecutive one-minute periods the source freshness alarm must stay above its threshold before it pages. 5 is
+    the default for every install. An install that raises the threshold for a commit window lowers this so the page
+    comes before derive's 10-minute seal: the page lands at about the threshold plus these periods. Terraform
+    refuses a threshold plus 60 x these periods above 600; the sum excludes CloudWatch's report lag (about a
+    minute, not measured).
+  EOT
+  validation {
+    condition     = var.capture_queue_freshness_evaluation_periods >= 1 && var.capture_queue_freshness_evaluation_periods <= 5 && floor(var.capture_queue_freshness_evaluation_periods) == var.capture_queue_freshness_evaluation_periods
+    error_message = "capture_queue_freshness_evaluation_periods must be a whole number from 1 to 5."
+  }
+  validation {
+    condition     = var.capture_queue_freshness_threshold_seconds + 60 * var.capture_queue_freshness_evaluation_periods <= 600
+    error_message = "capture_queue_freshness_threshold_seconds + 60 x capture_queue_freshness_evaluation_periods must be at most 600: the alarm pages at about that age, which has to stay within derive's 10-minute seal."
+  }
+}
+
 variable "capture_queue_sagemaker_endpoint_arn" {
   type        = string
   default     = ""
@@ -104,10 +143,11 @@ resource "aws_iam_role_policy" "capture_queue_consumer" {
   })
 }
 
-# Depth and in-flight counts are native SQS metrics; alarms focus on age and any DLQ work.
+# Depth and in-flight counts are native SQS metrics; alarms focus on age and any DLQ work. The freshness threshold
+# and its periods are variables because a held commit window makes a healthy writer's oldest message as old as the window.
 resource "aws_cloudwatch_metric_alarm" "capture_queue" {
   for_each = var.enable_capture_queue ? {
-    freshness = { dlq = false, metric = "ApproximateAgeOfOldestMessage", threshold = 60, periods = 5 }
+    freshness = { dlq = false, metric = "ApproximateAgeOfOldestMessage", threshold = var.capture_queue_freshness_threshold_seconds, periods = var.capture_queue_freshness_evaluation_periods }
     outage    = { dlq = false, metric = "ApproximateAgeOfOldestMessage", threshold = 86400, periods = 1 }
     dlq       = { dlq = true, metric = "ApproximateNumberOfMessagesVisible", threshold = 0, periods = 1 }
     dlq_age   = { dlq = true, metric = "ApproximateAgeOfOldestMessage", threshold = 3600, periods = 1 }
