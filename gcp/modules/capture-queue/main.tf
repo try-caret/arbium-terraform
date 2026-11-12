@@ -59,8 +59,9 @@ variable "freshness_duration_seconds" {
   default     = 300
   description = <<-EOT
     How long the source freshness alarm's condition must hold before it pages, in whole minutes (Cloud Monitoring
-    durations are multiples of 60 s). The alarm pages at about freshness_threshold_seconds plus this, after the
-    oldest unacked message first crossed the threshold, plus the metric's alignment and ingestion delay. That sum may not pass 600: the downstream derive step seals
+    durations are multiples of 60 s). The alarm pages about freshness_threshold_seconds plus this after the
+    oldest unacked message was published (this long after it crossed the threshold), plus the metric's alignment and
+    ingestion delay. That sum may not pass 600: the downstream derive step seals
     an episode 10 minutes after its last capture, and an alarm that pages later than that pages after the episode
     is sealed without the capture, which a late capture then cannot join. Default 300 keeps the original alarm.
   EOT
