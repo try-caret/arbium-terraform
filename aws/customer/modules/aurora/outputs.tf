@@ -29,3 +29,8 @@ output "performance_insights_enabled" {
 output "performance_insights_retention_period" {
   value = length(aws_rds_cluster_instance.this) > 0 ? aws_rds_cluster_instance.this[0].performance_insights_retention_period : null
 }
+
+output "allow_major_version_upgrade" {
+  description = "What the cluster carries for allow_major_version_upgrade: true during a planned major upgrade, otherwise null (unset)."
+  value       = aws_rds_cluster.this.allow_major_version_upgrade
+}

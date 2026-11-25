@@ -186,6 +186,7 @@ module "aurora" {
   eks_node_security_group_id            = module.eks.node_security_group_id
   database_name                         = var.database_name
   engine_version                        = var.aurora_engine_version
+  allow_major_version_upgrade           = var.aurora_allow_major_version_upgrade
   serverless_min_acu                    = var.aurora_serverless_min_acu
   serverless_max_acu                    = var.aurora_serverless_max_acu
   instance_count                        = var.aurora_instance_count

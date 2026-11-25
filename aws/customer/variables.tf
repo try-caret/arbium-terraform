@@ -334,9 +334,15 @@ variable "database_name" {
 }
 
 variable "aurora_engine_version" {
-  description = "Aurora PostgreSQL engine version."
+  description = "Aurora PostgreSQL engine version. Its major picks the parameter group family. Raising the major of an existing cluster is an upgrade: set aurora_allow_major_version_upgrade and plan the outage."
   type        = string
-  default     = "16.13"
+  default     = "17.11"
+}
+
+variable "aurora_allow_major_version_upgrade" {
+  description = "Allow aurora_engine_version to move to a new major on an existing cluster (planned upgrade window only)."
+  type        = bool
+  default     = false
 }
 
 variable "aurora_serverless_min_acu" {

@@ -1,5 +1,8 @@
 locals {
   name = "${var.name_prefix}-${var.environment}"
+  # The parameter group family follows the engine's major, so a cluster still pinned to an older major keeps
+  # its group while new installs get the module default. Changing a cluster's major is a separate, planned upgrade.
+  pg_major = split(".", var.engine_version)[0]
 }
 
 resource "aws_db_subnet_group" "this" {
@@ -38,14 +41,38 @@ resource "aws_security_group" "aurora" {
 }
 
 resource "aws_rds_cluster_parameter_group" "this" {
-  name        = "${local.name}-aurora-pg16"
-  family      = "aurora-postgresql16"
-  description = "Arbium Aurora PostgreSQL 16 cluster parameters"
+  name        = "${local.name}-aurora-pg${local.pg_major}"
+  family      = "aurora-postgresql${local.pg_major}"
+  description = "Arbium Aurora PostgreSQL ${local.pg_major} cluster parameters"
 
   parameter {
     name         = "shared_preload_libraries"
     value        = "pg_stat_statements"
     apply_method = "pending-reboot"
+  }
+
+  # Aurora PostgreSQL 17's default parameter group turns rds.force_ssl on (16's has it off), so after an upgrade
+  # the cluster refuses every connection without TLS. Some DSNs connect without it (selfhost-staging uses
+  # sslmode=disable), and that locked the staging app out after its rehearsal upgrade on 2026-11-25 (ARB-509).
+  # Keep 16's behaviour on 17. Enforcing TLS is a separate change, once every client's DSN requires it.
+  # Only on 17 and later, so the pg16 groups plan no change.
+  dynamic "parameter" {
+    for_each = tonumber(local.pg_major) >= 17 ? [1] : []
+    content {
+      name         = "rds.force_ssl"
+      value        = "0"
+      apply_method = "immediate"
+    }
+  }
+
+  # The name carries the major, so a major upgrade creates the new group before the old one is released
+  # (the cluster still uses the old one until ModifyDBCluster switches groups). The name stays fixed, not
+  # name_prefix: name_prefix would give every existing cluster a new generated name (a replacement, not a
+  # no-op). The one case a fixed name cannot cover is a later ForceNew edit within the same major (say the
+  # description): create-before-destroy would then try to create a second group with the same name. Such an
+  # edit needs a one-off name bump (e.g. a suffix) in the same change.
+  lifecycle {
+    create_before_destroy = true
   }
 
   tags = var.tags
@@ -55,6 +82,7 @@ resource "aws_rds_cluster" "this" {
   cluster_identifier              = "${local.name}-chaindb"
   engine                          = "aurora-postgresql"
   engine_version                  = var.engine_version
+  allow_major_version_upgrade     = var.allow_major_version_upgrade ? true : null # null, not false: provider never reads it back, so false would show as a change on every existing cluster
   engine_mode                     = "provisioned"
   database_name                   = var.database_name
   master_username                 = var.master_username

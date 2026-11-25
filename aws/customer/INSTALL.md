@@ -83,7 +83,7 @@ AWS-side:
   - **vCPU for EC2 G/VT On-Demand:** enough for `g4dn.xlarge` × 1+ if
     you enable the GPU embedder pool
 
-Region: anywhere with EKS 1.31+ + Aurora Postgres 16 + g4dn or g5 GPU
+Region: anywhere with EKS 1.31+ + Aurora Postgres 17 + g4dn or g5 GPU
 instances (us-east-1 most common).
 
 **Verify which AWS account/profile you're in before running terraform** —
@@ -253,7 +253,7 @@ Creates (created-network mode):
 - VPC across 3 AZs (private + public subnets, NAT, S3 + interface VPC endpoints)
 - EKS cluster + general managed node group + (optional) GPU managed node group
 - IRSA OIDC provider
-- Aurora Postgres 16 Serverless v2 cluster + writer instance + initial database
+- Aurora Postgres 17 Serverless v2 cluster + writer instance + initial database
 - Secrets Manager containers (empty)
 - AWS Load Balancer Controller, External Secrets Operator, Reloader (via Helm)
 - IRSA roles for the chart's `eso`, CaptureLake, admin-ui, factory-runner KSAs
@@ -279,6 +279,61 @@ Key ones:
 - `ingress_zone_id`, `ingress_zone_name_servers` (a **list** — when the hosted
   zone is Terraform-managed, these are the NS records to hand the customer for
   delegation)
+
+### Upgrading the Aurora major version (for example 16 to 17)
+
+An existing cluster only crosses a major when you ask for it, and the upgrade
+restarts the cluster, so expect downtime. Plan a window.
+
+1. In `terraform.tfvars` set `aurora_engine_version` to the target (for example
+   `"17.11"`) and `aurora_allow_major_version_upgrade = true` in the same
+   change. Nothing checks this at plan time: without the flag the plan looks
+   normal and the **apply** fails from AWS, after the new pg17 parameter group
+   was already created (`create_before_destroy`), leaving an unused group.
+   Aurora takes a preupgrade snapshot before it starts.
+2. Check that every database except `template0` allows connections. AWS's
+   upgrade precheck refuses the whole upgrade otherwise (the cluster stays
+   online and on the old version):
+
+   ```sql
+   SELECT datname FROM pg_database WHERE NOT datallowconn AND datname <> 'template0';
+   ```
+
+   For each row, either drop that database or run
+   `ALTER DATABASE <name> ALLOW_CONNECTIONS true` for the upgrade and set it
+   back afterwards. The reason is in the instance's
+   `error/pg_upgrade_precheck.log*` file.
+3. `terraform plan`, review, then `terraform apply`. On the 2026-11-25
+   staging rehearsal the cluster was offline for 8 minutes of a 12-minute apply.
+   The pg17 parameter group sets `rds.force_ssl = 0`, as on 16. Aurora 17's own
+   default is 1, which refuses every client whose DSN does not use TLS (for
+   example `sslmode=disable`). Once the cluster is available, check that the
+   new group took effect: `SHOW rds.force_ssl;` is `off`,
+   `SHOW shared_preload_libraries;` includes `pg_stat_statements`, and
+   `aws rds describe-db-clusters --db-cluster-identifier <cluster> --query
+   'DBClusters[0].DBClusterMembers[].DBClusterParameterGroupStatus'` is
+   `in-sync`. If `rds.force_ssl` is still on, set it with
+   `aws rds modify-db-cluster-parameter-group --db-cluster-parameter-group-name <group>
+   --parameters 'ParameterName=rds.force_ssl,ParameterValue=0,ApplyMethod=immediate'`;
+   if `pg_stat_statements` is missing, reboot the writer.
+4. Afterwards, in each database (chaindb, capturelake, derived), run the
+   following where the extensions are installed:
+
+   ```sql
+   ALTER EXTENSION vector UPDATE;
+   ALTER EXTENSION pg_stat_statements UPDATE;
+   ANALYZE;
+   ```
+
+   `ANALYZE` matters because a major upgrade drops the planner statistics.
+5. Set `aurora_allow_major_version_upgrade` back to `false` (or remove it) and
+   apply again. State holds `allow_major_version_upgrade = true` after the
+   upgrade apply and `false` is sent as null, so expect a single in-place
+   change on `aws_rds_cluster` (`allow_major_version_upgrade` true -> null, no
+   AWS API call). Apply it; the next plan shows no changes.
+
+Rollback: restore the preupgrade snapshot to a new cluster on the old version
+and point the workloads at it. An upgraded cluster cannot be downgraded in place.
 
 ---
 

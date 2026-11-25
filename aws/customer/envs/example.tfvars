@@ -62,7 +62,7 @@ secret_names = ["db", "scheduler", "scim", "sentry", "registry", "gemini", "enro
 
 # Aurora sizing. App traffic uses the Aurora writer endpoint.
 database_name                = "chaindb"
-aurora_engine_version        = "16.13"
+aurora_engine_version        = "17.11"
 aurora_serverless_min_acu    = 0.5
 aurora_serverless_max_acu    = 4
 aurora_instance_count        = 1

@@ -118,3 +118,18 @@ run "root_retention_reaches_the_module" {
     error_message = "aurora_performance_insights_retention_period must be passed from the root to the aurora module."
   }
 }
+run "root_major_upgrade_flag_reaches_the_cluster" {
+  command = plan
+  variables { aurora_allow_major_version_upgrade = true }
+  assert {
+    condition     = module.aurora.allow_major_version_upgrade == true
+    error_message = "aurora_allow_major_version_upgrade must reach the module's aws_rds_cluster (read through its allow_major_version_upgrade output)."
+  }
+}
+run "root_major_upgrade_flag_is_off_by_default" {
+  command = plan
+  assert {
+    condition     = module.aurora.allow_major_version_upgrade != true
+    error_message = "The root must not enable allow_major_version_upgrade unless asked."
+  }
+}

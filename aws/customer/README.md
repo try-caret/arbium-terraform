@@ -94,6 +94,16 @@ Protect plan files as sensitive. Apply only the reviewed saved plan after explic
 operator approval; do not combine initialization with an automatic apply. Retain the
 reviewed lockfile with your deployment configuration (the public mirror excludes it).
 
+## Upgrading to the PostgreSQL 17 default
+
+The default `aurora_engine_version` is now **17.11**. If you never set it, your
+cluster is on 16.x and the new default would ask for a major upgrade without
+`aurora_allow_major_version_upgrade`: the apply fails from AWS and every later
+apply fails the same way. Before updating to this release, pin your current
+version in `terraform.tfvars` (for example `aurora_engine_version = "16.13"`).
+To move to 17 on purpose, follow
+[INSTALL.md, "Upgrading the Aurora major version"](INSTALL.md#upgrading-the-aurora-major-version-for-example-16-to-17).
+
 ## Optional queued uploads
 
 Provisioning is opt-in (`enable_capture_queue=false` by default) and does not turn on

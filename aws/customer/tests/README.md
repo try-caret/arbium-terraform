@@ -48,7 +48,14 @@ subnet capacity or guarantee that a chosen reserve covers every scheduling burst
 covers the Aurora module's Performance Insights: on with 7 days by default, no retention sent when off, a longer retention
 passed through, and rejection of retention values AWS does not accept (accepts 7, 731 and multiples of 31 up to 713).
 `tests/aurora-performance-insights-root.tftest.hcl` (`-filter=tests/aurora-performance-insights-root.tftest.hcl`) plans
-the root and checks the two `aurora_performance_insights_*` variables reach the module.
+the root and checks the two `aurora_performance_insights_*` variables reach the module, and that
+`aurora_allow_major_version_upgrade` reaches the module's cluster (true when set, not true when unset).
+`tests/aurora-major-upgrade.tftest.hcl` (`-filter=tests/aurora-major-upgrade.tftest.hcl`) covers the Aurora module's
+major-version handling: the parameter group name, family and description follow the engine's major (a 16.x cluster keeps
+the pg16 values byte for byte and its one parameter, 17.x gets pg17 with `rds.force_ssl=0` applied immediately and
+`pg_stat_statements` still preloaded), the module defaults to 17.11, and `allow_major_version_upgrade` is unset
+(null, never an explicit false) by default and reaches the cluster when set; a malformed `engine_version` is rejected.
+The root wiring of the flag is covered at the root level by the file above.
 
 The internal checkout additionally has:
 

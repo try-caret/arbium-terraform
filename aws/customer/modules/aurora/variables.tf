@@ -16,7 +16,18 @@ variable "master_username" {
 
 variable "engine_version" {
   type    = string
-  default = "16.13"
+  default = "17.11"
+
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+", var.engine_version))
+    error_message = "engine_version must start with major.minor, for example 17.11 or 16.13; the major picks the parameter group family."
+  }
+}
+
+variable "allow_major_version_upgrade" {
+  description = "Let a change of engine_version cross a major. Leave false except for a planned upgrade window: the apply restarts the cluster."
+  type        = bool
+  default     = false
 }
 
 variable "serverless_min_acu" {
