@@ -330,7 +330,7 @@ restarts the cluster, so expect downtime. Plan a window.
    apply again. State holds `allow_major_version_upgrade = true` after the
    upgrade apply and `false` is sent as null, so expect a single in-place
    change on `aws_rds_cluster` (`allow_major_version_upgrade` true -> null, no
-   AWS API call). Apply it; the next plan shows no changes.
+   `ModifyDBCluster` call). Apply it; the next plan shows no changes.
 
 Rollback: restore the preupgrade snapshot to a new cluster on the old version
 and point the workloads at it. An upgraded cluster cannot be downgraded in place.
